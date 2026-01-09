@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { db } from '../store';
 import { Status, Program, AssetType, AssetVariant, Role, UUID } from '../types';
@@ -27,19 +26,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewProgram, canEdit, userRole,
   const topics = db.getTopics();
 
   useEffect(() => {
-    // When the dashboard mounts, fetch the latest programs from our store
     setPrograms(db.getPrograms());
   }, []);
 
-  // Filter logic: This computed property updates automatically whenever searchQuery or filter state changes
   const filteredPrograms = programs.filter(p => {
-    // 1. Title and Description Search (Live)
     const normalizedQuery = searchQuery.toLowerCase().trim();
     const searchMatch = !normalizedQuery || 
                        p.title.toLowerCase().includes(normalizedQuery) || 
                        p.description.toLowerCase().includes(normalizedQuery);
     
-    // 2. Status, Language, and Topic Filters
     const statusMatch = !filter.status || p.status === filter.status;
     const langMatch = !filter.language || p.language_primary === filter.language;
     const topicMatch = !filter.topic || p.topic_ids.includes(filter.topic);
@@ -70,7 +65,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewProgram, canEdit, userRole,
     setNewProgramDomain('');
     setNewProgramTopics([]);
     
-    // Refresh the local state so the new program appears immediately if filters allow
     setPrograms(db.getPrograms());
     onViewProgram(newProg.id);
   };
@@ -82,8 +76,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewProgram, canEdit, userRole,
   };
 
   return (
-    <div className="space-y-8 pb-12 animate-fade-in">
-      {/* Create Program Modal */}
+    <div className="space-y-10 pb-12 animate-fade-in">
       {isCreatingModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-[2.5rem] w-full max-w-2xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[90vh]">
@@ -166,7 +159,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewProgram, canEdit, userRole,
           {userRole === Role.ADMIN && onViewUsers && (
             <button 
               onClick={onViewUsers}
-              className="bg-slate-100 text-slate-700 hover:bg-slate-200 font-black py-4 px-8 rounded-2xl transition-all flex items-center space-x-3 border border-slate-200 shadow-sm"
+              className="bg-white text-slate-700 hover:bg-slate-50 font-black py-4 px-8 rounded-2xl transition-all flex items-center space-x-3 border border-slate-200 shadow-sm"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
               <span className="text-xs uppercase tracking-widest">Manage Team</span>
@@ -184,45 +177,18 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewProgram, canEdit, userRole,
         </div>
       </header>
 
-      {userRole === Role.ADMIN && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-amber-50 border border-amber-200 p-8 rounded-[2.5rem] flex flex-col justify-between group hover:bg-amber-100 transition-colors cursor-pointer" onClick={() => setIsCreatingModalOpen(true)}>
-             <div>
-               <div className="w-12 h-12 bg-amber-400 rounded-2xl flex items-center justify-center text-black shadow-lg mb-6 group-hover:scale-110 transition-transform">
-                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
-               </div>
-               <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">New Program Concept</h3>
-               <p className="text-sm text-slate-600 mt-2 font-medium leading-relaxed">Instantly prototype a new educational track and define its core learning topics.</p>
-             </div>
-          </div>
-          
-          <div className="bg-slate-900 border border-slate-800 p-8 rounded-[2.5rem] flex flex-col justify-between">
-             <div>
-               <div className="flex justify-between items-start mb-6">
-                 <div className="w-12 h-12 bg-slate-700 rounded-2xl flex items-center justify-center text-amber-400 shadow-lg">
-                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
-                 </div>
-                 <span className="text-[10px] font-black text-green-400 bg-green-400/10 px-2.5 py-1 rounded uppercase tracking-widest border border-green-400/20">System Live</span>
-               </div>
-               <h3 className="text-xl font-black text-white uppercase tracking-tighter">Engagement Vitals</h3>
-               <p className="text-sm text-slate-400 mt-2 font-medium leading-relaxed">Database synchronization is active. {programs.filter(p => p.status === Status.PUBLISHED).length} Programs are currently serving the public catalog.</p>
-             </div>
-          </div>
-        </div>
-      )}
-
       {/* Advanced Search & Filtering Bar */}
-      <div className="bg-white p-3 rounded-[2.5rem] shadow-sm border border-slate-200 flex flex-col lg:flex-row gap-3 items-center sticky top-24 z-30 transition-all">
+      <div className="bg-white p-4 rounded-[2.5rem] shadow-sm border border-slate-200 flex flex-col lg:flex-row gap-4 items-center sticky top-24 z-30 transition-all">
         <div className="relative flex-grow w-full flex items-center group">
           <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none">
             <svg className="w-5 h-5 text-slate-400 group-focus-within:text-amber-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
           </div>
           <input 
             type="text" 
-            placeholder="Search programs by title or description..." 
+            placeholder="Search programs by title or description keywords..." 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-14 pr-4 py-4 bg-slate-50 border-2 border-transparent focus:bg-white focus:border-amber-400 rounded-[1.75rem] outline-none font-bold text-slate-800 placeholder-slate-400 transition-all"
+            className="w-full pl-14 pr-14 py-4 bg-slate-50 border-2 border-transparent focus:bg-white focus:border-amber-400 rounded-[1.75rem] outline-none font-bold text-slate-800 placeholder-slate-400 transition-all"
           />
           {searchQuery && (
             <button 
@@ -235,28 +201,34 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewProgram, canEdit, userRole,
           )}
         </div>
         
-        <div className="flex gap-2 w-full lg:w-auto p-1.5 bg-slate-50 rounded-[1.75rem] border border-slate-200">
-          <select 
-            value={filter.status}
-            onChange={(e) => setFilter({...filter, status: e.target.value})}
-            className="bg-transparent border-none py-3 px-5 font-black text-[10px] uppercase tracking-widest text-slate-600 outline-none appearance-none cursor-pointer hover:text-black transition-colors"
-          >
-            <option value="">Status: All</option>
-            {Object.values(Status).map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <div className="w-px h-6 bg-slate-300 my-auto"></div>
-          <select 
-            value={filter.topic}
-            onChange={(e) => setFilter({...filter, topic: e.target.value})}
-            className="bg-transparent border-none py-3 px-5 font-black text-[10px] uppercase tracking-widest text-slate-600 outline-none appearance-none cursor-pointer hover:text-black transition-colors"
-          >
-            <option value="">Topic: All</option>
-            {topics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
+        <div className="flex gap-4 w-full lg:w-auto overflow-x-auto pb-2 lg:pb-0 custom-scrollbar">
+          <div className="flex bg-slate-50 p-1.5 rounded-2xl border border-slate-100 shrink-0">
+            <span className="px-3 py-2 text-[10px] font-black text-slate-400 uppercase self-center tracking-widest border-r border-slate-200 mr-1">Status</span>
+            <select 
+              value={filter.status}
+              onChange={(e) => setFilter({...filter, status: e.target.value})}
+              className="bg-transparent border-none py-2 px-3 font-black text-[10px] uppercase tracking-widest text-slate-600 outline-none cursor-pointer hover:text-black transition-colors"
+            >
+              <option value="">All</option>
+              {Object.values(Status).map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+
+          <div className="flex bg-slate-50 p-1.5 rounded-2xl border border-slate-100 shrink-0">
+            <span className="px-3 py-2 text-[10px] font-black text-slate-400 uppercase self-center tracking-widest border-r border-slate-200 mr-1">Topic</span>
+            <select 
+              value={filter.topic}
+              onChange={(e) => setFilter({...filter, topic: e.target.value})}
+              className="bg-transparent border-none py-2 px-3 font-black text-[10px] uppercase tracking-widest text-slate-600 outline-none cursor-pointer hover:text-black transition-colors"
+            >
+              <option value="">All</option>
+              {topics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10">
         {filteredPrograms.map(p => (
           <div 
             key={p.id}
@@ -269,8 +241,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewProgram, canEdit, userRole,
                 alt={p.title} 
                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000"
               />
-              <div className="absolute top-6 right-6">
-                <span className={`px-3 py-1 text-[9px] font-black rounded-lg shadow-lg uppercase tracking-widest border border-white/20 backdrop-blur-md ${
+              <div className="absolute top-6 right-6 flex flex-col items-end gap-2">
+                <span className={`px-3 py-1.5 text-[9px] font-black rounded-lg shadow-lg uppercase tracking-widest border border-white/20 backdrop-blur-md ${
                   p.status === Status.PUBLISHED ? 'bg-green-500/90 text-white' :
                   p.status === Status.DRAFT ? 'bg-amber-500/90 text-white' :
                   'bg-slate-900/90 text-white'
@@ -278,29 +250,34 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewProgram, canEdit, userRole,
                   {p.status}
                 </span>
               </div>
-              <div className="absolute bottom-0 inset-x-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent"></div>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-80 group-hover:opacity-100 transition-opacity"></div>
               <div className="absolute bottom-6 left-6 right-6">
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap gap-1.5 mb-3">
                   {p.topic_ids.map(tid => (
-                    <span key={tid} className="bg-amber-400 text-black text-[9px] font-black px-2.5 py-1 rounded uppercase tracking-tighter shadow-lg">
+                    <span key={tid} className="bg-amber-400 text-black text-[8px] font-black px-2 py-0.5 rounded uppercase tracking-tighter shadow-sm">
                       {topics.find(t => t.id === tid)?.name}
                     </span>
                   ))}
                 </div>
+                <h3 className="font-black text-xl text-white line-clamp-2 uppercase tracking-tight leading-tight">{p.title}</h3>
               </div>
             </div>
             <div className="p-8 flex-grow flex flex-col">
-              <h3 className="font-black text-xl text-slate-900 group-hover:text-amber-600 transition-colors line-clamp-1 uppercase tracking-tight">{p.title}</h3>
-              <p className="text-sm text-slate-500 mt-4 line-clamp-2 min-h-[40px] leading-relaxed font-medium">{p.description}</p>
+              <p className="text-sm text-slate-500 line-clamp-2 min-h-[40px] leading-relaxed font-medium">{p.description}</p>
               
-              <div className="mt-auto pt-6 flex items-center justify-between border-t border-slate-50">
-                <div className="flex items-center space-x-2 text-slate-400 font-black text-[10px] uppercase tracking-widest">
-                  <span className="bg-slate-100 px-2 py-1 rounded border border-slate-200">{p.language_primary}</span>
-                  <span className="text-slate-300">/</span>
-                  <span>{db.getTerms(p.id).length} Units</span>
+              <div className="mt-auto pt-6 flex items-center justify-between border-t border-slate-100">
+                <div className="flex items-center space-x-3">
+                  <div className="flex -space-x-2">
+                    {p.languages_available.map(lang => (
+                      <div key={lang} className="w-6 h-6 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[8px] font-black text-slate-500 uppercase">
+                        {lang}
+                      </div>
+                    ))}
+                  </div>
+                  <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{db.getTerms(p.id).length} Units</span>
                 </div>
-                <div className="text-[10px] text-slate-300 font-bold italic">
-                  Modified {new Date(p.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-amber-400 group-hover:text-black transition-colors">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
                 </div>
               </div>
             </div>
@@ -312,14 +289,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewProgram, canEdit, userRole,
             <div className="inline-block p-8 bg-slate-50 rounded-full mb-6 border border-slate-100 shadow-inner">
               <svg className="w-12 h-12 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
             </div>
-            <h3 className="text-2xl font-black text-slate-900 tracking-tight uppercase">No results found</h3>
-            <p className="text-slate-500 mt-3 font-medium max-w-sm mx-auto">We couldn't find any programs matching "<span className="text-amber-600 font-black">{searchQuery}</span>". Try refining your search or resetting filters.</p>
-            <button 
-                onClick={() => { setSearchQuery(''); setFilter({ status: '', language: '', topic: '' }); }}
-                className="mt-10 px-8 py-3 bg-black text-amber-400 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl active:scale-95"
-            >
-                Reset Search Filters
-            </button>
+            <h3 className="text-2xl font-black text-slate-900 tracking-tight uppercase">No matching programs</h3>
+            <p className="text-slate-500 mt-3 font-medium max-w-sm mx-auto">Try refining your search or resetting filters to find what you're looking for.</p>
           </div>
         )}
       </div>

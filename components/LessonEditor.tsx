@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db } from '../store';
 import { Lesson, Status, Role, ContentType, AssetType, AssetVariant } from '../types';
 
@@ -7,149 +7,233 @@ interface LessonEditorProps {
   id: string;
   onBack: () => void;
   role: Role;
+  showToast?: (message: string, type: 'success' | 'error' | 'info') => void;
 }
 
-const LessonEditor: React.FC<LessonEditorProps> = ({ id, onBack, role }) => {
+const LessonEditor: React.FC<LessonEditorProps> = ({ id, onBack, role, showToast }) => {
   const [lesson, setLesson] = useState<Lesson | undefined>(db.getLesson(id));
-  const assets = db.getAssets(id);
+  const [programTitle, setProgramTitle] = useState('');
   const [activeTab, setActiveTab] = useState<'details' | 'media' | 'publishing'>('details');
 
-  if (!lesson) return <div>Lesson not found</div>;
-
-  const handleUpdate = () => {
-    db.updateLesson(lesson);
-    alert('Lesson progress saved.');
-  };
-
-  const handleDeleteLesson = () => {
-    if (confirm('Permanently delete this lesson?')) {
-      db.deleteLesson(id);
-      onBack();
+  useEffect(() => {
+    if (lesson) {
+      const term = db.getTerm(lesson.term_id);
+      if (term) {
+        const program = db.getProgram(term.program_id);
+        if (program) setProgramTitle(program.title);
+      }
     }
-  };
+  }, [lesson]);
 
-  const handlePublishNow = () => {
-    // Validate assets
+  if (!lesson) return <div className="p-20 text-center font-black text-slate-400 uppercase tracking-widest">Lesson identifier not found</div>;
+
+  const assets = db.getAssets(id);
+
+  const validateForPublish = () => {
+    const errors: string[] = [];
+    
+    // Check required thumbnails for primary language
     const primaryAssets = assets.filter(a => a.language === lesson.content_language_primary && a.asset_type === AssetType.THUMBNAIL);
     const hasPortrait = primaryAssets.some(a => a.variant === AssetVariant.PORTRAIT);
     const hasLandscape = primaryAssets.some(a => a.variant === AssetVariant.LANDSCAPE);
 
-    if (!hasPortrait || !hasLandscape) {
-      alert(`Asset Requirement: Provide both Portrait & Landscape thumbnails for ${lesson.content_language_primary} before publishing.`);
+    if (!hasPortrait) errors.push("Missing primary portrait thumbnail.");
+    if (!hasLandscape) errors.push("Missing primary landscape thumbnail.");
+    
+    if (lesson.content_type === ContentType.VIDEO && (!lesson.duration_ms || lesson.duration_ms <= 0)) {
+        errors.push("Video content requires a valid duration in ms.");
+    }
+
+    const primaryUrl = lesson.content_urls_by_language[lesson.content_language_primary];
+    if (!primaryUrl) {
+        errors.push("Primary content URL is required.");
+    }
+
+    return errors;
+  };
+
+  const handleUpdate = () => {
+    try {
+      db.updateLesson(lesson);
+      showToast?.('Draft saved', 'success');
+    } catch (e: any) {
+      showToast?.(e.message, 'error');
+    }
+  };
+
+  const handlePublishNow = () => {
+    const errors = validateForPublish();
+    if (errors.length > 0) {
+      showToast?.(`Cannot publish: ${errors[0]}`, 'error');
       return;
     }
 
-    const updated = { ...lesson, status: Status.PUBLISHED, published_at: new Date().toISOString() };
-    setLesson(updated);
-    db.updateLesson(updated);
-    alert('Live on Chaishorts!');
+    const updated = { 
+        ...lesson, 
+        status: Status.PUBLISHED, 
+        published_at: lesson.published_at || new Date().toISOString() 
+    };
+    try {
+        db.updateLesson(updated);
+        setLesson(updated);
+        showToast?.('Module is now LIVE', 'success');
+    } catch (e: any) {
+        showToast?.(e.message, 'error');
+    }
+  };
+
+  const handleSchedule = () => {
+      if (!lesson.publish_at) {
+          showToast?.("Set a release time before scheduling.", "error");
+          return;
+      }
+      const updated = { ...lesson, status: Status.SCHEDULED };
+      try {
+          db.updateLesson(updated);
+          setLesson(updated);
+          showToast?.("Lesson scheduled for release.", "success");
+      } catch (e: any) {
+          showToast?.(e.message, "error");
+      }
   };
 
   return (
-    <div className="space-y-8 pb-20">
+    <div className="space-y-8 pb-20 animate-fade-in">
+      {/* Breadcrumbs */}
+      <nav className="flex items-center space-x-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">
+        <button onClick={onBack} className="hover:text-amber-600 transition-colors">Library</button>
+        <span>/</span>
+        <button onClick={onBack} className="hover:text-amber-600 transition-colors">{programTitle || 'Program'}</button>
+        <span>/</span>
+        <span className="text-slate-900">{lesson.title}</span>
+      </nav>
+
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center space-x-6">
           <button 
             onClick={onBack} 
-            className="p-3 hover:bg-white bg-slate-100 rounded-2xl text-slate-600 shadow-sm transition-all hover:text-amber-600"
+            className="p-4 hover:bg-black hover:text-white bg-white border border-slate-200 rounded-2xl text-slate-600 shadow-sm transition-all"
+            title="Back to Curriculum"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
           </button>
           <div>
-            <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">{lesson.title}</h2>
-            <div className="flex items-center space-x-3 mt-2">
-              <span className={`px-3 py-1 text-[10px] font-extrabold rounded-lg uppercase tracking-wider ${
-                lesson.status === Status.PUBLISHED ? 'bg-green-100 text-green-700' : 
-                lesson.status === Status.SCHEDULED ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
+            <h2 className="text-4xl font-black text-slate-900 tracking-tight uppercase">{lesson.title}</h2>
+            <div className="flex items-center space-x-4 mt-3">
+              <span className={`px-2.5 py-1 text-[9px] font-black rounded-lg uppercase tracking-widest shadow-sm ${
+                lesson.status === Status.PUBLISHED ? 'bg-green-500 text-white' : 
+                lesson.status === Status.SCHEDULED ? 'bg-blue-500 text-white' : 'bg-amber-500 text-white'
               }`}>{lesson.status}</span>
-              <span className="text-slate-400 text-xs font-medium">L# {lesson.lesson_number} • {lesson.content_type.toUpperCase()}</span>
+              <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest">UNIT #{lesson.lesson_number} • {lesson.content_type.toUpperCase()}</span>
             </div>
           </div>
         </div>
         
         {role !== Role.VIEWER && (
           <div className="flex items-center space-x-3">
-             <button 
-              onClick={handleDeleteLesson}
-              className="px-6 py-3 text-red-600 font-bold bg-red-50 hover:bg-red-100 rounded-xl transition-colors"
-            >
-              Delete
-            </button>
             <button 
               onClick={handleUpdate}
-              className="px-6 py-3 text-slate-700 font-bold bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+              className="px-6 py-4 text-slate-700 font-black bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all uppercase text-xs tracking-widest"
             >
               Save Draft
             </button>
-            <button 
-              onClick={handlePublishNow}
-              className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-xl shadow-lg shadow-green-200 transition-all"
-            >
-              Go Live
-            </button>
+            {lesson.status !== Status.PUBLISHED && (
+                <>
+                    <button 
+                        onClick={handleSchedule}
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-black py-4 px-8 rounded-2xl shadow-xl transition-all uppercase text-xs tracking-widest"
+                    >
+                        Schedule
+                    </button>
+                    <button 
+                        onClick={handlePublishNow}
+                        className="bg-green-600 hover:bg-green-700 text-white font-black py-4 px-10 rounded-2xl shadow-xl shadow-green-200 transition-all transform active:scale-95 uppercase text-xs tracking-widest"
+                    >
+                        Publish Now
+                    </button>
+                </>
+            )}
           </div>
         )}
       </header>
 
-      <div className="flex space-x-1 bg-slate-200 p-1.5 rounded-2xl w-fit">
-        <button onClick={() => setActiveTab('details')} className={`px-6 py-2.5 rounded-xl font-bold transition-all text-sm ${activeTab === 'details' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>General</button>
-        <button onClick={() => setActiveTab('media')} className={`px-6 py-2.5 rounded-xl font-bold transition-all text-sm ${activeTab === 'media' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Thumbnails & Links</button>
-        <button onClick={() => setActiveTab('publishing')} className={`px-6 py-2.5 rounded-xl font-bold transition-all text-sm ${activeTab === 'publishing' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Publishing</button>
+      <div className="flex space-x-1 bg-slate-200/50 p-1.5 rounded-[2rem] w-fit border border-slate-200/60 shadow-inner">
+        {[
+          { id: 'details', label: 'General Details' },
+          { id: 'media', label: 'Media & Assets' },
+          { id: 'publishing', label: 'Scheduling & Archive' }
+        ].map(tab => (
+          <button 
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)} 
+            className={`px-10 py-3.5 rounded-[1.5rem] font-black transition-all text-[10px] uppercase tracking-widest ${
+              activeTab === tab.id ? 'bg-white text-black shadow-md border border-slate-200' : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px]">
+      <div className="bg-white rounded-[3.5rem] shadow-sm border border-slate-200 overflow-hidden min-h-[600px]">
         {activeTab === 'details' && (
-          <div className="p-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Lesson Title</label>
+          <div className="p-12">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-16">
+              <div className="space-y-10">
+                <div className="space-y-3">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Module Title</label>
                   <input 
                     type="text" value={lesson.title} 
                     disabled={role === Role.VIEWER}
                     onChange={(e) => setLesson({...lesson, title: e.target.value})}
-                    className="w-full bg-slate-50 border-slate-200 rounded-xl py-3 px-4 focus:ring-2 focus:ring-amber-500 outline-none font-medium"
+                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl py-5 px-8 focus:bg-white focus:border-amber-400 focus:ring-4 focus:ring-amber-50 outline-none font-black text-slate-900 transition-all uppercase tracking-tight"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Content Type</label>
-                    <select 
-                      value={lesson.content_type} 
-                      disabled={role === Role.VIEWER}
-                      onChange={(e) => setLesson({...lesson, content_type: e.target.value as any})}
-                      className="w-full bg-slate-50 border-slate-200 rounded-xl py-3 px-4 focus:ring-2 focus:ring-amber-500 font-bold"
-                    >
-                      <option value={ContentType.VIDEO}>Video Short</option>
-                      <option value={ContentType.ARTICLE}>Read Article</option>
-                    </select>
+                <div className="grid grid-cols-2 gap-8">
+                  <div className="space-y-3">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Content Type</label>
+                    <div className="relative">
+                      <select 
+                        value={lesson.content_type} 
+                        disabled={role === Role.VIEWER}
+                        onChange={(e) => setLesson({...lesson, content_type: e.target.value as any})}
+                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl py-5 px-8 focus:bg-white focus:border-amber-400 outline-none font-black text-slate-900 appearance-none uppercase tracking-widest cursor-pointer"
+                      >
+                        <option value={ContentType.VIDEO}>Video Short</option>
+                        <option value={ContentType.ARTICLE}>Read Article</option>
+                      </select>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Duration (ms)</label>
+                  <div className="space-y-3">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Duration (MS)</label>
                     <input 
                       type="number" value={lesson.duration_ms || 0} 
                       disabled={role === Role.VIEWER}
                       onChange={(e) => setLesson({...lesson, duration_ms: parseInt(e.target.value)})}
-                      className="w-full bg-slate-50 border-slate-200 rounded-xl py-3 px-4 focus:ring-2 focus:ring-amber-500 font-medium"
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl py-5 px-8 focus:bg-white focus:border-amber-400 outline-none font-black text-slate-900 transition-all uppercase tracking-widest"
                     />
                   </div>
                 </div>
               </div>
               
-              <div className="space-y-6">
-                <div className={`p-6 rounded-2xl border-2 transition-all ${
+              <div className="space-y-10">
+                <div className={`p-10 rounded-[2.5rem] border-2 transition-all shadow-sm ${
                   lesson.is_paid ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100'
                 }`}>
-                  <div className="flex items-start space-x-4">
-                    <input 
-                      type="checkbox" checked={lesson.is_paid} 
-                      disabled={role === Role.VIEWER}
-                      onChange={(e) => setLesson({...lesson, is_paid: e.target.checked})}
-                      className="w-6 h-6 mt-1 rounded-lg text-amber-600 focus:ring-amber-500"
-                    />
+                  <div className="flex items-start space-x-6">
+                    <div className="relative">
+                       <input 
+                        type="checkbox" checked={lesson.is_paid} 
+                        disabled={role === Role.VIEWER}
+                        onChange={(e) => setLesson({...lesson, is_paid: e.target.checked})}
+                        className="w-8 h-8 rounded-xl text-amber-600 border-2 border-slate-300 focus:ring-amber-500 cursor-pointer"
+                      />
+                    </div>
                     <div>
-                      <span className="font-extrabold text-slate-900 block">Premium Asset</span>
-                      <span className="text-xs text-slate-500 font-medium leading-relaxed block mt-1">Users will need an active subscription to access this content on the mobile app.</span>
+                      <span className="font-black text-xl text-slate-900 block uppercase tracking-tighter leading-none">Premium Content</span>
+                      <p className="text-xs text-slate-500 font-medium leading-relaxed mt-3">
+                        When enabled, users will require an active subscription to access this content on public apps.
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -159,30 +243,31 @@ const LessonEditor: React.FC<LessonEditorProps> = ({ id, onBack, role }) => {
         )}
 
         {activeTab === 'media' && (
-          <div className="p-8 space-y-12">
+          <div className="p-12 space-y-16">
             <section>
-              <div className="mb-6">
-                <h3 className="text-xl font-extrabold text-slate-900">Visual Thumbnails</h3>
-                <p className="text-sm text-slate-500 mt-1">Provide previews for different app layouts.</p>
+              <div className="mb-10">
+                <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Visual Thumbnails</h3>
+                <p className="text-sm text-slate-500 mt-1 font-medium">Previews for different app layouts and platform types.</p>
               </div>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12">
                 {[AssetVariant.PORTRAIT, AssetVariant.LANDSCAPE, AssetVariant.SQUARE].map(variant => {
                   const asset = assets.find(a => a.variant === variant && a.asset_type === AssetType.THUMBNAIL);
                   return (
-                    <div key={variant} className="space-y-2">
-                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{variant}</label>
-                      <div className="aspect-square bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl overflow-hidden relative group hover:border-amber-300">
-                        {asset ? <img src={asset.url} alt={variant} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-300 font-bold uppercase text-[10px]">No Thumbnail</div>}
+                    <div key={variant} className="space-y-4">
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">{variant}</label>
+                      <div className="aspect-square bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2.5rem] overflow-hidden relative group hover:border-amber-400 transition-all hover:shadow-2xl hover:shadow-amber-100/50">
+                        {asset ? <img src={asset.url} alt={variant} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" /> : <div className="w-full h-full flex items-center justify-center text-slate-300 font-black uppercase text-[10px] tracking-widest">Missing</div>}
                         {role !== Role.VIEWER && (
-                          <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 flex items-center justify-center backdrop-blur-sm transition-all">
+                          <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 flex items-center justify-center backdrop-blur-[4px] transition-all">
                             <button onClick={() => {
                               const url = prompt('Thumbnail URL:', asset?.url || '');
                               if (url !== null) {
                                 db.upsertAsset({ parent_id: id, language: lesson.content_language_primary, variant, asset_type: AssetType.THUMBNAIL, url });
+                                showToast?.('Thumbnail updated', 'success');
                                 setLesson({...lesson});
                               }
-                            }} className="bg-white text-slate-900 px-5 py-2 rounded-xl text-xs font-black shadow-xl">Update</button>
+                            }} className="bg-amber-400 text-black px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-2xl scale-90 group-hover:scale-100 transition-all">Link Artwork</button>
                           </div>
                         )}
                       </div>
@@ -193,28 +278,29 @@ const LessonEditor: React.FC<LessonEditorProps> = ({ id, onBack, role }) => {
             </section>
             
             <section>
-              <div className="mb-6">
-                <h3 className="text-xl font-extrabold text-slate-900">Content Storage</h3>
-                <p className="text-sm text-slate-500 mt-1">Primary and secondary stream URLs for the player.</p>
+              <div className="mb-10">
+                <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Asset Hosting</h3>
+                <p className="text-sm text-slate-500 mt-1 font-medium">Primary and localized resource streams for the media player.</p>
               </div>
               
-              <div className="bg-slate-50 rounded-3xl border border-slate-200 overflow-hidden">
-                <table className="w-full text-left">
-                  <thead className="bg-slate-100/50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              <div className="bg-slate-50 rounded-[3rem] border-2 border-slate-100 overflow-hidden shadow-inner">
+                <table className="w-full text-left border-collapse">
+                  <thead className="bg-slate-100/50 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
                     <tr>
-                      <th className="px-6 py-4">Track</th>
-                      <th className="px-6 py-4">Resource URL</th>
+                      <th className="px-10 py-6">Track Identity</th>
+                      <th className="px-10 py-6">Secure CDN Endpoint URL</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {lesson.content_languages_available.map(lang => (
-                      <tr key={lang}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`font-black text-xs ${lang === lesson.content_language_primary ? 'text-amber-600' : 'text-slate-500'}`}>
-                            {lang.toUpperCase()} {lang === lesson.content_language_primary && <span className="bg-amber-100 text-[9px] px-1.5 py-0.5 rounded-md ml-2">PRIMARY</span>}
-                          </span>
+                      <tr key={lang} className="hover:bg-white transition-colors">
+                        <td className="px-10 py-6 whitespace-nowrap">
+                          <div className="flex items-center space-x-3">
+                             <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center font-black text-xs text-slate-500 shadow-sm uppercase">{lang}</div>
+                             {lang === lesson.content_language_primary && <span className="text-[8px] font-black text-amber-600 bg-amber-50 px-2 py-1 rounded uppercase tracking-widest border border-amber-200 shadow-sm">Main</span>}
+                          </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-10 py-6">
                           <input 
                             type="text" 
                             value={lesson.content_urls_by_language[lang] || ''} 
@@ -223,8 +309,8 @@ const LessonEditor: React.FC<LessonEditorProps> = ({ id, onBack, role }) => {
                               const updated = { ...lesson.content_urls_by_language, [lang]: e.target.value };
                               setLesson({...lesson, content_urls_by_language: updated});
                             }}
-                            className="w-full text-sm bg-white border border-slate-200 rounded-lg py-2 px-3 outline-none focus:ring-1 focus:ring-amber-500 font-medium"
-                            placeholder="https://cdn.chaishorts.com/..."
+                            className="w-full text-sm bg-white border-2 border-slate-100 rounded-2xl py-4 px-6 outline-none focus:border-amber-400 transition-all font-medium text-slate-700"
+                            placeholder="https://cdn.chaishorts.com/stream/..."
                           />
                         </td>
                       </tr>
@@ -237,48 +323,57 @@ const LessonEditor: React.FC<LessonEditorProps> = ({ id, onBack, role }) => {
         )}
 
         {activeTab === 'publishing' && (
-          <div className="p-8">
-             <div className="max-w-2xl bg-amber-50 p-8 rounded-3xl border border-amber-200">
-               <div className="flex items-center space-x-3 mb-6">
-                 <div className="bg-amber-600 p-2 rounded-lg text-white">
-                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          <div className="p-12">
+             <div className="max-w-3xl bg-amber-50/50 p-12 rounded-[3.5rem] border-2 border-amber-100 shadow-xl shadow-amber-100/20">
+               <div className="flex items-center space-x-6 mb-10">
+                 <div className="bg-amber-400 p-4 rounded-3xl text-black shadow-lg">
+                   <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                  </div>
-                 <h3 className="text-xl font-extrabold text-amber-900">Scheduled Release</h3>
+                 <div>
+                    <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Automated Release</h3>
+                    <p className="text-slate-500 font-medium">Set a target timestamp for the module to go live.</p>
+                 </div>
                </div>
                
-               <div className="space-y-6">
-                 <div>
-                   <label className="block text-sm font-bold text-amber-800 mb-3 uppercase tracking-wider">Release Timestamp</label>
+               <div className="space-y-10">
+                 <div className="space-y-4">
+                   <label className="block text-[10px] font-black text-amber-800 uppercase tracking-[0.2em] ml-1">Go-Live Timestamp</label>
                    <input 
                     type="datetime-local" 
                     disabled={role === Role.VIEWER}
                     value={lesson.publish_at ? new Date(lesson.publish_at).toISOString().slice(0, 16) : ''}
-                    onChange={(e) => setLesson({...lesson, publish_at: e.target.value, status: Status.SCHEDULED})}
-                    className="w-full bg-white border-amber-200 rounded-2xl py-4 px-6 focus:ring-4 focus:ring-amber-200 outline-none font-extrabold text-amber-900 shadow-sm"
+                    onChange={(e) => {
+                      setLesson({...lesson, publish_at: e.target.value});
+                    }}
+                    className="w-full bg-white border-2 border-amber-200 rounded-[2rem] py-5 px-8 focus:ring-8 focus:ring-amber-200/30 outline-none font-black text-amber-900 shadow-sm transition-all"
                    />
                  </div>
                  
-                 <div className="flex items-start space-x-3 p-4 bg-white/50 rounded-2xl border border-amber-100">
-                   <svg className="w-5 h-5 text-amber-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                   <p className="text-xs text-amber-700 font-medium leading-relaxed">
-                     When you set a schedule, the status changes to <span className="font-black">SCHEDULED</span>. 
-                     Our background worker checks every minute to publish these automatically.
+                 <div className="flex items-start space-x-4 p-8 bg-white/60 rounded-[2.5rem] border border-amber-100 shadow-inner">
+                   <div className="w-10 h-10 rounded-xl bg-amber-400 flex items-center justify-center text-black shrink-0 shadow-sm">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                   </div>
+                   <p className="text-xs text-amber-800 font-bold leading-relaxed mt-1">
+                     The <span className="font-black text-black">Scheduler</span> will process this record automatically at the specified time. 
+                     All media links and artwork MUST be finalized.
                    </p>
                  </div>
 
                  {lesson.status !== Status.ARCHIVED && (
-                   <div className="pt-6 mt-6 border-t border-amber-100">
+                   <div className="pt-10 mt-10 border-t border-amber-100 flex items-center justify-between">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">End of lifecycle actions</p>
                      <button 
                       onClick={() => {
-                        if (confirm('Move to Archive? This removes it from the catalog immediately.')) {
+                        if (confirm('Move to Archive? This module will be immediately removed from the catalog.')) {
                           const updated = { ...lesson, status: Status.ARCHIVED };
                           setLesson(updated);
                           db.updateLesson(updated);
+                          showToast?.('Moved to Archive', 'info');
                         }
                       }}
-                      className="text-red-600 font-black hover:bg-red-50 px-6 py-3 rounded-xl transition-all inline-flex items-center space-x-2"
+                      className="text-red-600 font-black hover:bg-red-50 px-8 py-4 rounded-2xl transition-all inline-flex items-center space-x-3 uppercase text-[10px] tracking-widest border border-transparent hover:border-red-100 shadow-sm"
                      >
-                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
+                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                        <span>Archive Lesson</span>
                      </button>
                    </div>

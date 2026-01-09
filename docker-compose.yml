@@ -1,0 +1,45 @@
+
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: chaishorts
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: chaishorts_cms
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations.sql:/docker-entrypoint-initdb.d/1-migrations.sql
+      - ./seed.sql:/docker-entrypoint-initdb.d/2-seed.sql
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgres://chaishorts:password123@db:5432/chaishorts_cms
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+
+  worker:
+    build: .
+    command: ["npm", "run", "worker"]
+    environment:
+      DATABASE_URL: postgres://chaishorts:password123@db:5432/chaishorts_cms
+    depends_on:
+      - db
+
+  web:
+    build: .
+    command: ["npm", "run", "dev"]
+    ports:
+      - "5173:5173"
+    environment:
+      API_URL: http://api:3000
+
+volumes:
+  postgres_data:

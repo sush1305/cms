@@ -72,7 +72,7 @@ export interface Lesson {
   lesson_number: number;
   title: string;
   content_type: ContentType;
-  duration_ms?: number;
+  duration_ms: number; // Required if video
   is_paid: boolean;
   content_language_primary: string;
   content_languages_available: string[];

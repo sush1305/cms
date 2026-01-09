@@ -7,6 +7,8 @@ interface NavbarProps {
   onLogout: () => void;
   setView: (v: 'dashboard' | 'catalog' | 'users' | 'settings') => void;
   activeView: string;
+  currentLanguage: string;
+  onLanguageChange: (lang: string) => void;
 }
 
 const Logo = () => (
@@ -34,12 +36,67 @@ const Logo = () => (
   </div>
 );
 
-const Navbar: React.FC<NavbarProps> = ({ user, onLogout, setView, activeView }) => {
-  const [lang, setLang] = useState('English');
+const translations: Record<string, Record<string, string>> = {
+  English: {
+    library: 'Library',
+    team: 'Team',
+    publicApi: 'Public API',
+    home: 'Dashboard Home',
+    manageTeam: 'Team Management',
+    settings: 'Security Settings',
+    signOut: 'Sign Out'
+  },
+  Hindi: {
+    library: 'लाइब्रेरी',
+    team: 'टीम',
+    publicApi: 'पब्लिक API',
+    home: 'डैशबोर्ड होम',
+    manageTeam: 'टीम मैनेजमेंट',
+    settings: 'सुरक्षा सेटिंग्स',
+    signOut: 'साइन आउट'
+  },
+  Telugu: {
+    library: 'లైబ్రరీ',
+    team: 'టీమ్',
+    publicApi: 'పబ్లిక్ API',
+    home: 'డ్యాష్‌బోర్డ్ హోమ్',
+    manageTeam: 'టీమ్ మేనేజ్మెంట్',
+    settings: 'భద్రతా సెట్టింగులు',
+    signOut: 'సైన్ అవుట్'
+  },
+  Spanish: {
+    library: 'Biblioteca',
+    team: 'Equipo',
+    publicApi: 'API Pública',
+    home: 'Inicio del Panel',
+    manageTeam: 'Gestión de Equipo',
+    settings: 'Seguridad',
+    signOut: 'Cerrar Sesión'
+  },
+  French: {
+    library: 'Bibliothèque',
+    team: 'Équipe',
+    publicApi: 'API Publique',
+    home: 'Accueil',
+    manageTeam: 'Gestion d\'Équipe',
+    settings: 'Paramètres',
+    signOut: 'Déconnexion'
+  }
+};
+
+const Navbar: React.FC<NavbarProps> = ({ 
+  user, 
+  onLogout, 
+  setView, 
+  activeView, 
+  currentLanguage, 
+  onLanguageChange 
+}) => {
   const [showLangMenu, setShowLangMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   const languages = ['English', 'Hindi', 'Telugu', 'Spanish', 'French'];
+  const t = translations[currentLanguage] || translations['English'];
 
   return (
     <nav className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
@@ -56,7 +113,7 @@ const Navbar: React.FC<NavbarProps> = ({ user, onLogout, setView, activeView }) 
                 activeView === 'dashboard' ? 'bg-black text-amber-400 shadow-lg' : 'text-slate-500 hover:bg-slate-50'
               }`}
             >
-              Library
+              {t.library}
             </button>
             
             {user.role === Role.ADMIN && (
@@ -66,7 +123,7 @@ const Navbar: React.FC<NavbarProps> = ({ user, onLogout, setView, activeView }) 
                   activeView === 'users' ? 'bg-black text-amber-400 shadow-lg' : 'text-slate-500 hover:bg-slate-50'
                 }`}
               >
-                Team
+                {t.team}
               </button>
             )}
             
@@ -74,7 +131,7 @@ const Navbar: React.FC<NavbarProps> = ({ user, onLogout, setView, activeView }) 
               onClick={() => setView('catalog' as any)}
               className="px-5 py-2.5 text-slate-500 hover:bg-slate-50 rounded-xl font-black text-sm uppercase tracking-widest transition-all"
             >
-              Public API
+              {t.publicApi}
             </button>
           </div>
         </div>
@@ -86,7 +143,7 @@ const Navbar: React.FC<NavbarProps> = ({ user, onLogout, setView, activeView }) 
               className="flex items-center space-x-2 px-4 py-2 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 transition-all group"
             >
               <svg className="w-5 h-5 text-slate-400 group-hover:text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
-              <span className="text-xs font-black uppercase tracking-widest text-slate-700 hidden sm:block">{lang}</span>
+              <span className="text-xs font-black uppercase tracking-widest text-slate-700 hidden sm:block">{currentLanguage}</span>
             </button>
             {showLangMenu && (
               <>
@@ -95,8 +152,8 @@ const Navbar: React.FC<NavbarProps> = ({ user, onLogout, setView, activeView }) 
                   {languages.map(l => (
                     <button 
                       key={l}
-                      onClick={() => { setLang(l); setShowLangMenu(false); }}
-                      className={`w-full text-left px-6 py-2.5 text-xs font-black uppercase tracking-widest hover:bg-amber-50 hover:text-amber-700 transition-colors ${l === lang ? 'bg-amber-50 text-amber-700' : 'text-slate-600'}`}
+                      onClick={() => { onLanguageChange(l); setShowLangMenu(false); }}
+                      className={`w-full text-left px-6 py-2.5 text-xs font-black uppercase tracking-widest hover:bg-amber-50 hover:text-amber-700 transition-colors ${l === currentLanguage ? 'bg-amber-50 text-amber-700' : 'text-slate-600'}`}
                     >
                       {l}
                     </button>
@@ -144,7 +201,7 @@ const Navbar: React.FC<NavbarProps> = ({ user, onLogout, setView, activeView }) 
                       <div className="p-2 bg-slate-100 rounded-lg group-hover:bg-amber-100 transition-colors">
                         <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
                       </div>
-                      <span>Dashboard Home</span>
+                      <span>{t.home}</span>
                     </button>
                     {user.role === Role.ADMIN && (
                       <button 
@@ -154,7 +211,7 @@ const Navbar: React.FC<NavbarProps> = ({ user, onLogout, setView, activeView }) 
                         <div className="p-2 bg-slate-100 rounded-lg group-hover:bg-amber-100 transition-colors">
                           <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
                         </div>
-                        <span>Team Management</span>
+                        <span>{t.manageTeam}</span>
                       </button>
                     )}
                     <button 
@@ -164,7 +221,7 @@ const Navbar: React.FC<NavbarProps> = ({ user, onLogout, setView, activeView }) 
                       <div className="p-2 bg-slate-100 rounded-lg group-hover:bg-amber-100 transition-colors">
                         <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                       </div>
-                      <span>Security Settings</span>
+                      <span>{t.settings}</span>
                     </button>
                     <div className="h-px bg-slate-100 mx-4 my-2"></div>
                     <button 
@@ -174,7 +231,7 @@ const Navbar: React.FC<NavbarProps> = ({ user, onLogout, setView, activeView }) 
                       <div className="p-2 bg-red-50 rounded-lg">
                         <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                       </div>
-                      <span>Sign Out</span>
+                      <span>{t.signOut}</span>
                     </button>
                   </div>
                 </div>
