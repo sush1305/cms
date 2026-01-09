@@ -1,0 +1,7 @@
+{
+  "name": "Copy of Chaishorts CMS",
+  "description": "A robust Content Management System for managing snackable educational content, terms, and lessons with scheduled publishing.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
