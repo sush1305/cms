@@ -20,35 +20,37 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Improved duplicate check
+    // Check for existing email
     const existingUser = db.getUserByEmail(newUser.email);
     if (existingUser) {
-      alert(`The email "${newUser.email}" is already registered in the team.`);
+      alert(`The email "${newUser.email}" is already registered.`);
       return;
     }
 
     const created = db.createUser(newUser);
-    // Important: we must update the local state with the actual fresh list from DB to ensure sync
-    setUsers([...db.getUsers()]);
+    // Refresh the list from the database
+    setUsers(db.getUsers());
     setIsAdding(false);
     setNewUser({ username: '', email: '', password: '', role: Role.VIEWER });
-    alert(`Team member ${created.username} added successfully!`);
   };
 
-  const handleDelete = (e: React.MouseEvent, id: string, name: string) => {
-    // Stop propagation just in case row clicks are added later
-    e.stopPropagation();
-
-    if (id === 'u1') {
-      alert('Primary administrator ("u1") cannot be deleted for system safety.');
+  const handleDelete = (userId: string, userName: string) => {
+    // Safety check: Never delete the primary admin
+    if (userId === 'u1') {
+      alert('The primary system administrator cannot be deleted.');
       return;
     }
     
-    if (confirm(`DANGER: Are you absolutely sure you want to remove ${name}? This will immediately revoke their access to the CMS.`)) {
-      db.deleteUser(id);
-      // Update local state to trigger re-render
-      const updatedUsers = db.getUsers();
-      setUsers(updatedUsers);
+    // Explicit confirmation dialog
+    if (window.confirm(`DANGER: Are you sure you want to permanently delete user "${userName}"? This will revoke all access to the CMS immediately.`)) {
+      try {
+        db.deleteUser(userId);
+        // Update local state using functional filtering to ensure UI sync
+        setUsers(prevUsers => prevUsers.filter(u => u.id !== userId));
+      } catch (error) {
+        console.error('Failed to delete user:', error);
+        alert('An error occurred while trying to delete the user.');
+      }
     }
   };
 
@@ -132,13 +134,18 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
             </div>
             <div>
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Assigned Role</label>
-              <select 
-                className="w-full bg-slate-50 border-slate-200 border-2 rounded-2xl p-4 outline-none focus:border-amber-400 font-black text-slate-700 transition-all appearance-none"
-                value={newUser.role}
-                onChange={e => setNewUser({...newUser, role: e.target.value as Role})}
-              >
-                {Object.values(Role).map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
+              <div className="relative">
+                <select 
+                  className="w-full bg-slate-50 border-slate-200 border-2 rounded-2xl p-4 outline-none focus:border-amber-400 font-black text-slate-700 transition-all appearance-none"
+                  value={newUser.role}
+                  onChange={e => setNewUser({...newUser, role: e.target.value as Role})}
+                >
+                  {Object.values(Role).map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                </div>
+              </div>
             </div>
             <div className="flex items-end">
               <button type="submit" className="w-full bg-black text-amber-400 py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:bg-slate-800 transition-all transform active:scale-95">Send Invite</button>
@@ -149,7 +156,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
 
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
+          <table className="w-full text-left border-collapse">
             <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
               <tr>
                 <th className="px-10 py-6">Member Identity</th>
@@ -188,8 +195,8 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
                   <td className="px-10 py-6 text-right">
                     {u.id !== 'u1' && (
                       <button 
-                        onClick={(e) => handleDelete(e, u.id, u.username)}
-                        className="p-3 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-2xl transition-all opacity-0 group-hover:opacity-100"
+                        onClick={() => handleDelete(u.id, u.username)}
+                        className="p-3 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-2xl transition-all"
                         title="Delete User"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>

@@ -20,7 +20,7 @@ const ProgramDetail: React.FC<ProgramDetailProps> = ({ id, onBack, onEditLesson,
   const assets = db.getAssets(id);
   const [activeTab, setActiveTab] = useState<'info' | 'assets' | 'content'>('content');
 
-  if (!program) return <div>Program not found</div>;
+  if (!program) return <div className="p-20 text-center font-black text-slate-400 uppercase tracking-widest">Program not found</div>;
 
   const handleUpdate = () => {
     db.updateProgram(program);
@@ -28,9 +28,9 @@ const ProgramDetail: React.FC<ProgramDetailProps> = ({ id, onBack, onEditLesson,
   };
 
   const handleDeleteProgram = () => {
-    if (confirm('Are you SURE? This will delete all terms and lessons associated with this program.')) {
+    if (confirm(`DANGER: Are you sure you want to delete "${program.title}"? This will permanently remove all associated terms, lessons, and assets. This action is irreversible.`)) {
       db.deleteProgram(id);
-      onBack();
+      onBack(); // Navigation back to dashboard
     }
   };
 
@@ -97,7 +97,7 @@ const ProgramDetail: React.FC<ProgramDetailProps> = ({ id, onBack, onEditLesson,
           <div className="flex items-center space-x-3">
              <button 
               onClick={handleDeleteProgram}
-              className="px-6 py-3.5 text-red-600 font-black text-sm hover:bg-red-50 rounded-2xl transition-all"
+              className="px-6 py-3.5 text-red-600 font-black text-sm hover:bg-red-50 rounded-2xl transition-all border border-transparent hover:border-red-100"
             >
               Delete Program
             </button>
@@ -293,7 +293,7 @@ const ProgramDetail: React.FC<ProgramDetailProps> = ({ id, onBack, onEditLesson,
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Description</label>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Description / Domain</label>
                     <textarea 
                       rows={6}
                       value={program.description} 

@@ -46,64 +46,57 @@ const INITIAL_PROGRAMS: Program[] = [
   }
 ];
 
-const INITIAL_TERMS: Term[] = [
-  { id: 'tm1', program_id: 'p1', term_number: 1, title: 'Foundations', created_at: new Date().toISOString() },
-  { id: 'tm2', program_id: 'p1', term_number: 2, title: 'Advanced Concepts', created_at: new Date().toISOString() },
-];
-
-const INITIAL_LESSONS: Lesson[] = [
-  {
-    id: 'l1',
-    term_id: 'tm1',
-    lesson_number: 1,
-    title: 'Introduction to React 19',
-    content_type: ContentType.VIDEO,
-    duration_ms: 300000,
-    is_paid: false,
-    content_language_primary: 'en',
-    content_languages_available: ['en'],
-    content_urls_by_language: { 'en': 'https://example.com/v1.mp4' },
-    subtitle_languages: ['en'],
-    subtitle_urls_by_language: { 'en': 'https://example.com/s1.vtt' },
-    status: Status.PUBLISHED,
-    published_at: new Date().toISOString(),
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'l2',
-    term_id: 'tm1',
-    lesson_number: 2,
-    title: 'Server Components Deep Dive',
-    content_type: ContentType.VIDEO,
-    duration_ms: 450000,
-    is_paid: true,
-    content_language_primary: 'en',
-    content_languages_available: ['en'],
-    content_urls_by_language: { 'en': 'https://example.com/v2.mp4' },
-    subtitle_languages: ['en'],
-    subtitle_urls_by_language: { 'en': 'https://example.com/s2.vtt' },
-    status: Status.SCHEDULED,
-    publish_at: new Date(Date.now() + 120000).toISOString(), // 2 minutes from now
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  }
-];
-
-const INITIAL_ASSETS: Asset[] = [
-  { id: 'a1', parent_id: 'p1', language: 'en', variant: AssetVariant.PORTRAIT, asset_type: AssetType.POSTER, url: 'https://picsum.photos/400/600?seed=chaicoder' },
-  { id: 'a2', parent_id: 'p1', language: 'en', variant: AssetVariant.LANDSCAPE, asset_type: AssetType.POSTER, url: 'https://picsum.photos/1200/600?seed=chaicoder' },
-  { id: 'a3', parent_id: 'l1', language: 'en', variant: AssetVariant.PORTRAIT, asset_type: AssetType.THUMBNAIL, url: 'https://picsum.photos/400/600?seed=react' },
-  { id: 'a4', parent_id: 'l1', language: 'en', variant: AssetVariant.LANDSCAPE, asset_type: AssetType.THUMBNAIL, url: 'https://picsum.photos/1200/600?seed=react' },
-];
+const STORAGE_KEY = 'chaishorts_db';
 
 class Database {
-  private programs: Program[] = [...INITIAL_PROGRAMS];
-  private topics: Topic[] = [...INITIAL_TOPICS];
-  private terms: Term[] = [...INITIAL_TERMS];
-  private lessons: Lesson[] = [...INITIAL_LESSONS];
-  private assets: Asset[] = [...INITIAL_ASSETS];
-  private users: User[] = [...INITIAL_USERS];
+  private programs: Program[] = [];
+  private topics: Topic[] = [];
+  private terms: Term[] = [];
+  private lessons: Lesson[] = [];
+  private assets: Asset[] = [];
+  private users: User[] = [];
+
+  constructor() {
+    this.load();
+  }
+
+  private load() {
+    const data = localStorage.getItem(STORAGE_KEY);
+    if (data) {
+      try {
+        const parsed = JSON.parse(data);
+        this.programs = parsed.programs || [];
+        this.topics = parsed.topics || INITIAL_TOPICS;
+        this.terms = parsed.terms || [];
+        this.lessons = parsed.lessons || [];
+        this.assets = parsed.assets || [];
+        this.users = parsed.users || INITIAL_USERS;
+      } catch (e) {
+        this.resetToDefaults();
+      }
+    } else {
+      this.resetToDefaults();
+    }
+  }
+
+  private resetToDefaults() {
+    this.programs = [...INITIAL_PROGRAMS];
+    this.topics = [...INITIAL_TOPICS];
+    this.users = [...INITIAL_USERS];
+    this.save();
+  }
+
+  private save() {
+    const data = {
+      programs: this.programs,
+      topics: this.topics,
+      terms: this.terms,
+      lessons: this.lessons,
+      assets: this.assets,
+      users: this.users
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  }
 
   getPrograms() { return [...this.programs]; }
   getProgram(id: string) { return this.programs.find(p => p.id === id); }
@@ -121,17 +114,20 @@ class Database {
   createUser(user: Omit<User, 'id'>) {
     const newUser = { ...user, id: generateId() } as User;
     this.users.push(newUser);
+    this.save();
     return newUser;
   }
 
   updateUser(user: User) {
     this.users = this.users.map(u => u.id === user.id ? user : u);
+    this.save();
   }
 
   changePassword(userId: string, newPassword: string) {
     const user = this.users.find(u => u.id === userId);
     if (user) {
       user.password = newPassword;
+      this.save();
       return true;
     }
     return false;
@@ -139,6 +135,7 @@ class Database {
 
   deleteUser(userId: string) {
     this.users = this.users.filter(u => u.id !== userId);
+    this.save();
   }
 
   createProgram(program: Partial<Program>) {
@@ -150,11 +147,13 @@ class Database {
       updated_at: new Date().toISOString() 
     } as Program;
     this.programs.push(newProg);
+    this.save();
     return newProg;
   }
 
   updateProgram(program: Program) {
     this.programs = this.programs.map(p => p.id === program.id ? { ...program, updated_at: new Date().toISOString() } : p);
+    this.save();
   }
 
   deleteProgram(id: string) {
@@ -163,33 +162,39 @@ class Database {
     this.terms = this.terms.filter(t => t.program_id !== id);
     this.lessons = this.lessons.filter(l => !pTerms.includes(l.term_id));
     this.assets = this.assets.filter(a => a.parent_id !== id);
+    this.save();
   }
 
   createTerm(term: Partial<Term>) {
     const newTerm = { ...term, id: generateId(), created_at: new Date().toISOString() } as Term;
     this.terms.push(newTerm);
+    this.save();
     return newTerm;
   }
 
   deleteTerm(id: string) {
     this.terms = this.terms.filter(t => t.id !== id);
     this.lessons = this.lessons.filter(l => l.term_id !== id);
+    this.save();
   }
 
   updateLesson(lesson: Lesson) {
     this.lessons = this.lessons.map(l => l.id === lesson.id ? { ...lesson, updated_at: new Date().toISOString() } : l);
     this.autoPublishProgram(lesson.term_id);
+    this.save();
   }
 
   createLesson(lesson: Partial<Lesson>) {
     const newLesson = { ...lesson, id: generateId(), created_at: new Date().toISOString(), updated_at: new Date().toISOString() } as Lesson;
     this.lessons.push(newLesson);
+    this.save();
     return newLesson;
   }
 
   deleteLesson(id: string) {
     this.lessons = this.lessons.filter(l => l.id !== id);
     this.assets = this.assets.filter(a => a.parent_id !== id);
+    this.save();
   }
 
   upsertAsset(asset: Omit<Asset, 'id'>) {
@@ -204,6 +209,7 @@ class Database {
     } else {
       this.assets.push({ ...asset, id: generateId() });
     }
+    this.save();
   }
 
   processScheduled() {
@@ -218,7 +224,6 @@ class Database {
     });
     
     if (updatedCount > 0) {
-        // Trigger auto-publish for programs if necessary
         this.programs.forEach(p => {
             const pTerms = this.terms.filter(t => t.program_id === p.id).map(t => t.id);
             const hasPublished = this.lessons.some(l => pTerms.includes(l.term_id) && l.status === Status.PUBLISHED);
@@ -227,6 +232,7 @@ class Database {
                 if (!p.published_at) p.published_at = new Date().toISOString();
             }
         });
+        this.save();
         console.log(`Worker: Published ${updatedCount} scheduled lessons.`);
     }
   }

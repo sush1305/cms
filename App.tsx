@@ -44,29 +44,33 @@ const App: React.FC = () => {
   const goBackToDashboard = () => setCurrentView('dashboard');
 
   if (!user) {
+    if (currentView === 'catalog') {
+      return (
+        <div className="fixed inset-0 bg-white z-[100] overflow-auto">
+          <button 
+            onClick={() => setCurrentView('dashboard')}
+            className="fixed top-8 right-8 bg-white border border-slate-200 text-slate-900 px-6 py-3 rounded-2xl font-black shadow-2xl hover:bg-slate-50 transition-all z-[110]"
+          >
+            ✕ Exit Catalog
+          </button>
+          <PublicCatalog />
+        </div>
+      );
+    }
+
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6">
+      <div className="min-h-screen">
         <Login onLogin={handleLogin} />
         
-        <button 
-          onClick={() => setCurrentView('catalog')}
-          className="mt-12 text-slate-500 hover:text-amber-600 font-bold text-sm tracking-wide transition-colors flex items-center space-x-2"
-        >
-          <span>Explore Developer Catalog API</span>
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
-        </button>
-        
-        {currentView === 'catalog' && (
-          <div className="fixed inset-0 bg-white z-[100] overflow-auto">
-            <button 
-              onClick={() => setCurrentView('dashboard')}
-              className="fixed top-8 right-8 bg-white border border-slate-200 text-slate-900 px-6 py-3 rounded-2xl font-black shadow-2xl hover:bg-slate-50 transition-all z-[110]"
-            >
-              ✕ Exit Catalog
-            </button>
-            <PublicCatalog />
-          </div>
-        )}
+        <div className="fixed bottom-12 left-0 right-0 flex justify-center z-20">
+          <button 
+            onClick={() => setCurrentView('catalog')}
+            className="text-white/80 hover:text-white font-black text-sm tracking-widest transition-colors flex items-center space-x-2 bg-black/20 backdrop-blur-md px-6 py-3 rounded-full border border-white/10"
+          >
+            <span>EXPLORE PUBLIC API CATALOG</span>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
+          </button>
+        </div>
       </div>
     );
   }
