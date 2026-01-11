@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../store';
 import { Lesson, Status, Role, ContentType, AssetType, AssetVariant } from '../types';
 
@@ -14,6 +13,11 @@ const LessonEditor: React.FC<LessonEditorProps> = ({ id, onBack, role, showToast
   const [lesson, setLesson] = useState<Lesson | undefined>(db.getLesson(id));
   const [programTitle, setProgramTitle] = useState('');
   const [activeTab, setActiveTab] = useState<'details' | 'media' | 'publishing'>('details');
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (lesson) {
@@ -96,6 +100,59 @@ const LessonEditor: React.FC<LessonEditorProps> = ({ id, onBack, role, showToast
           showToast?.(e.message, "error");
       }
   };
+
+  const simulateUpload = async (file: File) => {
+    if (!file.type.startsWith('video/')) {
+      showToast?.("Invalid file format. Please upload a video file.", "error");
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    // Simulation of cloud storage (S3/Cloudinary/Mux) upload process
+    const totalSteps = 100;
+    for (let i = 0; i <= totalSteps; i += 10) {
+      setUploadProgress(i);
+      await new Promise(resolve => setTimeout(resolve, 150));
+    }
+
+    // Create a local blob URL for immediate preview (simulating a permanent CDN URL)
+    const mockCdnUrl = URL.createObjectURL(file);
+    
+    const currentLang = lesson.content_language_primary;
+    const updatedUrls = { ...lesson.content_urls_by_language, [currentLang]: mockCdnUrl };
+    const updatedLesson = { ...lesson, content_urls_by_language: updatedUrls };
+    
+    setLesson(updatedLesson);
+    db.updateLesson(updatedLesson);
+    
+    setIsUploading(false);
+    showToast?.("Video processed and linked successfully", "success");
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) simulateUpload(file);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) simulateUpload(file);
+  };
+
+  const currentVideoUrl = lesson.content_urls_by_language[lesson.content_language_primary];
 
   return (
     <div className="space-y-8 pb-20 animate-fade-in">
@@ -246,6 +303,92 @@ const LessonEditor: React.FC<LessonEditorProps> = ({ id, onBack, role, showToast
           <div className="p-12 space-y-16">
             <section>
               <div className="mb-10">
+                <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Content Upload</h3>
+                <p className="text-sm text-slate-500 mt-1 font-medium">Directly upload high-definition video assets to the platform.</p>
+              </div>
+
+              {lesson.content_type === ContentType.VIDEO ? (
+                <div 
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className={`relative p-12 rounded-[3.5rem] border-4 border-dashed transition-all flex flex-col items-center justify-center text-center group min-h-[400px] ${
+                    isDragging ? 'bg-amber-50 border-amber-400' : 'bg-slate-50 border-slate-200'
+                  } ${isUploading ? 'opacity-70 pointer-events-none' : 'hover:bg-slate-100/50 hover:border-amber-300'}`}
+                >
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleFileChange} 
+                    accept="video/*" 
+                    className="hidden" 
+                  />
+                  
+                  {isUploading ? (
+                    <div className="space-y-8 w-full max-w-md animate-fade-in">
+                       <div className="relative w-24 h-24 mx-auto">
+                          <svg className="w-full h-full animate-spin text-amber-500" viewBox="0 0 24 24">
+                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                       </div>
+                       <div className="space-y-2">
+                          <p className="font-black text-slate-900 uppercase tracking-widest">Processing Content... {uploadProgress}%</p>
+                          <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden shadow-inner">
+                             <div className="h-full bg-amber-500 transition-all duration-300 shadow-[0_0_10px_rgba(245,158,11,0.5)]" style={{ width: `${uploadProgress}%` }}></div>
+                          </div>
+                       </div>
+                       <p className="text-xs text-slate-400 font-bold uppercase tracking-widest animate-pulse">Encoding for multiple bitrates</p>
+                    </div>
+                  ) : currentVideoUrl ? (
+                    <div className="space-y-10 w-full flex flex-col items-center animate-fade-in">
+                       <div className="w-full max-w-2xl aspect-video bg-black rounded-[2.5rem] overflow-hidden shadow-2xl relative group/player">
+                          <video 
+                            src={currentVideoUrl} 
+                            className="w-full h-full object-contain"
+                            controls
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/player:opacity-100 transition-opacity flex items-center justify-center">
+                              <button 
+                                onClick={() => fileInputRef.current?.click()}
+                                className="bg-white text-black font-black px-8 py-4 rounded-2xl shadow-2xl uppercase tracking-widest text-xs transform hover:scale-105 active:scale-95 transition-all"
+                              >
+                                Replace Asset
+                              </button>
+                          </div>
+                       </div>
+                       <div className="flex items-center space-x-3 bg-white px-6 py-3 rounded-full border border-slate-200 shadow-sm">
+                          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Asset Ready • Linked to {lesson.content_language_primary}</span>
+                       </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-8 animate-fade-in">
+                      <div className="w-24 h-24 bg-white rounded-3xl shadow-xl border border-slate-100 mx-auto flex items-center justify-center text-slate-400 group-hover:text-amber-500 group-hover:rotate-6 transition-all duration-500">
+                        <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                      </div>
+                      <div>
+                        <h4 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Drop your video here</h4>
+                        <p className="text-slate-500 text-sm font-medium mt-2 max-w-sm mx-auto">Upload MP4, MOV, or WEBM files. Max 500MB per lesson for optimal streaming performance.</p>
+                      </div>
+                      <button 
+                        onClick={() => fileInputRef.current?.click()}
+                        className="bg-black text-amber-400 font-black px-10 py-4 rounded-2xl shadow-xl uppercase text-xs tracking-widest transform group-hover:translate-y-[-4px] active:translate-y-0 transition-all"
+                      >
+                        Browse Media
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-12 bg-slate-50 rounded-[3rem] border-2 border-slate-100 text-center">
+                   <p className="text-slate-400 font-black uppercase tracking-widest text-xs italic">Asset upload is optimized for video shorts. For articles, please provide external URLs in the settings below.</p>
+                </div>
+              )}
+            </section>
+
+            <section>
+              <div className="mb-10">
                 <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Visual Thumbnails</h3>
                 <p className="text-sm text-slate-500 mt-1 font-medium">Previews for different app layouts and platform types.</p>
               </div>
@@ -279,8 +422,8 @@ const LessonEditor: React.FC<LessonEditorProps> = ({ id, onBack, role, showToast
             
             <section>
               <div className="mb-10">
-                <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Asset Hosting</h3>
-                <p className="text-sm text-slate-500 mt-1 font-medium">Primary and localized resource streams for the media player.</p>
+                <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Localized Resource Mappings</h3>
+                <p className="text-sm text-slate-500 mt-1 font-medium">Direct CDN endpoints for alternative language streams.</p>
               </div>
               
               <div className="bg-slate-50 rounded-[3rem] border-2 border-slate-100 overflow-hidden shadow-inner">

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { db } from './store';
 import { User, Role, Status } from './types';
@@ -49,12 +48,12 @@ const App: React.FC = () => {
     showToast(`Welcome back, ${u.username}!`, 'success');
   };
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     setUser(null);
     localStorage.removeItem('chaishorts_user');
     setCurrentView('dashboard');
     showToast('Logged out successfully', 'info');
-  };
+  }, [showToast]);
 
   const goBackToDashboard = () => {
     setCurrentView('dashboard');
@@ -145,7 +144,12 @@ const App: React.FC = () => {
         )}
         
         {currentView === 'users' && user.role === Role.ADMIN && (
-          <UserManagement onBack={goBackToDashboard} showToast={showToast} />
+          <UserManagement 
+            currentUser={user}
+            onLogout={handleLogout}
+            onBack={goBackToDashboard} 
+            showToast={showToast} 
+          />
         )}
 
         {currentView === 'settings' && (

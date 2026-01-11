@@ -25,8 +25,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewProgram, canEdit, userRole,
 
   const topics = db.getTopics();
 
-  useEffect(() => {
+  const refreshPrograms = () => {
     setPrograms(db.getPrograms());
+  };
+
+  useEffect(() => {
+    refreshPrograms();
   }, []);
 
   const filteredPrograms = programs.filter(p => {
@@ -65,8 +69,16 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewProgram, canEdit, userRole,
     setNewProgramDomain('');
     setNewProgramTopics([]);
     
-    setPrograms(db.getPrograms());
+    refreshPrograms();
     onViewProgram(newProg.id);
+  };
+
+  const handleDeleteProgram = (e: React.MouseEvent, id: UUID, title: string) => {
+    e.stopPropagation();
+    if (window.confirm(`Are you sure you want to permanently delete "${title}"? This will also remove all associated lessons and media.`)) {
+      db.deleteProgram(id);
+      refreshPrograms();
+    }
   };
 
   const toggleTopic = (topicId: UUID) => {
@@ -78,40 +90,37 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewProgram, canEdit, userRole,
   return (
     <div className="space-y-10 pb-12 animate-fade-in">
       {isCreatingModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-[2.5rem] w-full max-w-2xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[90vh]">
             <div className="bg-amber-400 p-8 text-black shrink-0">
-              <h3 className="text-2xl font-black uppercase tracking-tighter">Launch New Program</h3>
-              <p className="text-sm font-bold opacity-80 mt-1">Define the goals and domain of your new curriculum.</p>
+              <h3 className="text-2xl font-black uppercase tracking-tighter">New Program</h3>
             </div>
-            <form onSubmit={handleConfirmCreate} className="p-8 space-y-6 overflow-y-auto custom-scrollbar">
+            <form onSubmit={handleConfirmCreate} className="p-8 space-y-6 overflow-y-auto">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Program Title</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Title</label>
                 <input 
                   autoFocus
                   required
                   type="text"
                   value={newProgramTitle}
                   onChange={(e) => setNewProgramTitle(e.target.value)}
-                  placeholder="e.g. Master Class: Modern UI Design"
-                  className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-amber-400 outline-none transition-all font-bold text-slate-800"
+                  className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-amber-400 outline-none font-bold"
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Domain & Core Objectives</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Description</label>
                 <textarea 
                   required
                   value={newProgramDomain}
                   onChange={(e) => setNewProgramDomain(e.target.value)}
-                  placeholder="Describe what will be taught in this program..."
                   rows={3}
-                  className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-amber-400 outline-none transition-all font-bold text-slate-800"
+                  className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-amber-400 outline-none font-bold"
                 />
               </div>
 
               <div className="space-y-3">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Focus Topics</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Topics</label>
                 <div className="flex flex-wrap gap-2">
                   {topics.map(t => (
                     <button
@@ -130,19 +139,19 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewProgram, canEdit, userRole,
                 </div>
               </div>
 
-              <div className="flex gap-4 pt-4 shrink-0">
+              <div className="flex gap-4 pt-4">
                 <button 
                   type="button"
                   onClick={() => setIsCreatingModalOpen(false)}
-                  className="flex-1 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-all"
+                  className="flex-1 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-400 hover:bg-slate-50"
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit"
-                  className="flex-1 px-6 py-4 bg-black text-amber-400 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-slate-800 transition-all transform active:scale-95"
+                  className="flex-1 px-6 py-4 bg-black text-amber-400 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl"
                 >
-                  Create Program
+                  Create
                 </button>
               </div>
             </form>
@@ -153,78 +162,57 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewProgram, canEdit, userRole,
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight uppercase">Content Library</h1>
-          <p className="text-slate-500 mt-2 font-medium">Manage your educational shorts and program catalog.</p>
+          <p className="text-slate-500 mt-2 font-medium">Manage programs and catalog.</p>
         </div>
         <div className="flex items-center space-x-3">
           {userRole === Role.ADMIN && onViewUsers && (
             <button 
               onClick={onViewUsers}
-              className="bg-white text-slate-700 hover:bg-slate-50 font-black py-4 px-8 rounded-2xl transition-all flex items-center space-x-3 border border-slate-200 shadow-sm"
+              className="bg-white text-slate-700 hover:bg-slate-50 font-black py-4 px-8 rounded-2xl transition-all border border-slate-200 shadow-sm"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-              <span className="text-xs uppercase tracking-widest">Manage Team</span>
+              Manage Team
             </button>
           )}
           {canEdit && (
             <button 
               onClick={() => setIsCreatingModalOpen(true)}
-              className="bg-black text-amber-400 hover:bg-slate-800 font-black py-4 px-8 rounded-2xl shadow-xl transition-all transform hover:-translate-y-0.5 active:scale-95 flex items-center space-x-3"
+              className="bg-black text-amber-400 hover:bg-slate-800 font-black py-4 px-8 rounded-2xl shadow-xl transition-all"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
-              <span className="text-xs uppercase tracking-widest">Create Program</span>
+              + Create Program
             </button>
           )}
         </div>
       </header>
 
-      {/* Advanced Search & Filtering Bar */}
-      <div className="bg-white p-4 rounded-[2.5rem] shadow-sm border border-slate-200 flex flex-col lg:flex-row gap-4 items-center sticky top-24 z-30 transition-all">
-        <div className="relative flex-grow w-full flex items-center group">
-          <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none">
-            <svg className="w-5 h-5 text-slate-400 group-focus-within:text-amber-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-          </div>
+      <div className="bg-white p-4 rounded-[2.5rem] shadow-sm border border-slate-200 flex flex-col lg:flex-row gap-4 items-center">
+        <div className="relative flex-grow w-full">
           <input 
             type="text" 
-            placeholder="Search programs by title or description keywords..." 
+            placeholder="Search programs..." 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-14 pr-14 py-4 bg-slate-50 border-2 border-transparent focus:bg-white focus:border-amber-400 rounded-[1.75rem] outline-none font-bold text-slate-800 placeholder-slate-400 transition-all"
+            className="w-full pl-6 pr-14 py-4 bg-slate-50 border-2 border-transparent focus:bg-white focus:border-amber-400 rounded-[1.75rem] outline-none font-bold transition-all"
           />
-          {searchQuery && (
-            <button 
-              onClick={() => setSearchQuery('')}
-              className="absolute right-4 text-slate-400 hover:text-slate-600 p-2 bg-slate-200/50 rounded-full transition-all"
-              title="Clear search"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
-          )}
         </div>
         
-        <div className="flex gap-4 w-full lg:w-auto overflow-x-auto pb-2 lg:pb-0 custom-scrollbar">
-          <div className="flex bg-slate-50 p-1.5 rounded-2xl border border-slate-100 shrink-0">
-            <span className="px-3 py-2 text-[10px] font-black text-slate-400 uppercase self-center tracking-widest border-r border-slate-200 mr-1">Status</span>
-            <select 
-              value={filter.status}
-              onChange={(e) => setFilter({...filter, status: e.target.value})}
-              className="bg-transparent border-none py-2 px-3 font-black text-[10px] uppercase tracking-widest text-slate-600 outline-none cursor-pointer hover:text-black transition-colors"
-            >
-              <option value="">All</option>
-              {Object.values(Status).map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
+        <div className="flex gap-4">
+          <select 
+            value={filter.status}
+            onChange={(e) => setFilter({...filter, status: e.target.value})}
+            className="bg-slate-50 border-2 border-transparent focus:border-amber-400 py-4 px-6 rounded-[1.75rem] font-black text-[10px] uppercase tracking-widest outline-none cursor-pointer"
+          >
+            <option value="">All Statuses</option>
+            {Object.values(Status).map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
 
-          <div className="flex bg-slate-50 p-1.5 rounded-2xl border border-slate-100 shrink-0">
-            <span className="px-3 py-2 text-[10px] font-black text-slate-400 uppercase self-center tracking-widest border-r border-slate-200 mr-1">Topic</span>
-            <select 
-              value={filter.topic}
-              onChange={(e) => setFilter({...filter, topic: e.target.value})}
-              className="bg-transparent border-none py-2 px-3 font-black text-[10px] uppercase tracking-widest text-slate-600 outline-none cursor-pointer hover:text-black transition-colors"
-            >
-              <option value="">All</option>
-              {topics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-          </div>
+          <select 
+            value={filter.topic}
+            onChange={(e) => setFilter({...filter, topic: e.target.value})}
+            className="bg-slate-50 border-2 border-transparent focus:border-amber-400 py-4 px-6 rounded-[1.75rem] font-black text-[10px] uppercase tracking-widest outline-none cursor-pointer"
+          >
+            <option value="">All Topics</option>
+            {topics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
         </div>
       </div>
 
@@ -233,7 +221,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewProgram, canEdit, userRole,
           <div 
             key={p.id}
             onClick={() => onViewProgram(p.id)}
-            className="group bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden cursor-pointer hover:shadow-2xl hover:border-amber-200 transition-all transform hover:-translate-y-2 flex flex-col"
+            className="group bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden cursor-pointer hover:shadow-2xl hover:border-amber-200 transition-all transform hover:-translate-y-2 flex flex-col relative"
           >
             <div className="aspect-[3/4] relative overflow-hidden bg-slate-100">
               <img 
@@ -242,43 +230,23 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewProgram, canEdit, userRole,
                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000"
               />
               <div className="absolute top-6 right-6 flex flex-col items-end gap-2">
-                <span className={`px-3 py-1.5 text-[9px] font-black rounded-lg shadow-lg uppercase tracking-widest border border-white/20 backdrop-blur-md ${
-                  p.status === Status.PUBLISHED ? 'bg-green-500/90 text-white' :
-                  p.status === Status.DRAFT ? 'bg-amber-500/90 text-white' :
-                  'bg-slate-900/90 text-white'
-                }`}>
+                <span className="px-3 py-1.5 text-[9px] font-black rounded-lg shadow-lg uppercase tracking-widest bg-black text-amber-400">
                   {p.status}
                 </span>
+                
+                {canEdit && (
+                  <button 
+                    onClick={(e) => handleDeleteProgram(e, p.id, p.title)}
+                    className="p-2.5 bg-red-600/90 text-white rounded-xl shadow-lg border border-white/20 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all hover:bg-red-700"
+                    title="Delete Program"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  </button>
+                )}
               </div>
-              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-80 group-hover:opacity-100 transition-opacity"></div>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-80 transition-opacity"></div>
               <div className="absolute bottom-6 left-6 right-6">
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {p.topic_ids.map(tid => (
-                    <span key={tid} className="bg-amber-400 text-black text-[8px] font-black px-2 py-0.5 rounded uppercase tracking-tighter shadow-sm">
-                      {topics.find(t => t.id === tid)?.name}
-                    </span>
-                  ))}
-                </div>
                 <h3 className="font-black text-xl text-white line-clamp-2 uppercase tracking-tight leading-tight">{p.title}</h3>
-              </div>
-            </div>
-            <div className="p-8 flex-grow flex flex-col">
-              <p className="text-sm text-slate-500 line-clamp-2 min-h-[40px] leading-relaxed font-medium">{p.description}</p>
-              
-              <div className="mt-auto pt-6 flex items-center justify-between border-t border-slate-100">
-                <div className="flex items-center space-x-3">
-                  <div className="flex -space-x-2">
-                    {p.languages_available.map(lang => (
-                      <div key={lang} className="w-6 h-6 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[8px] font-black text-slate-500 uppercase">
-                        {lang}
-                      </div>
-                    ))}
-                  </div>
-                  <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{db.getTerms(p.id).length} Units</span>
-                </div>
-                <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-amber-400 group-hover:text-black transition-colors">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
-                </div>
               </div>
             </div>
           </div>
@@ -286,11 +254,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewProgram, canEdit, userRole,
 
         {filteredPrograms.length === 0 && (
           <div className="col-span-full py-24 text-center bg-white rounded-[3rem] border-2 border-dashed border-slate-200">
-            <div className="inline-block p-8 bg-slate-50 rounded-full mb-6 border border-slate-100 shadow-inner">
-              <svg className="w-12 h-12 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-            </div>
             <h3 className="text-2xl font-black text-slate-900 tracking-tight uppercase">No matching programs</h3>
-            <p className="text-slate-500 mt-3 font-medium max-w-sm mx-auto">Try refining your search or resetting filters to find what you're looking for.</p>
           </div>
         )}
       </div>

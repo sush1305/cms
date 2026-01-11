@@ -30,10 +30,17 @@ const ProgramDetail: React.FC<ProgramDetailProps> = ({ id, onBack, onEditLesson,
   };
 
   const handleDeleteProgram = () => {
-    if (confirm(`CRITICAL: This will permanently delete "${program.title}" and all associated content. Continue?`)) {
-      db.deleteProgram(id);
-      showToast?.('Program deleted', 'info');
-      onBack();
+    // Permanent deletion confirmation
+    if (window.confirm(`PERMANENT DELETION: Are you sure you want to completely remove "${program.title}"?\n\nThis action will erase all units, modules, and associated media assets. This cannot be undone.`)) {
+      try {
+        db.deleteProgram(id);
+        showToast?.('Program successfully removed from library', 'info');
+        // Navigate away after deletion
+        onBack();
+      } catch (error) {
+        console.error('Program deletion failed:', error);
+        showToast?.('System error during deletion.', 'error');
+      }
     }
   };
 
@@ -51,7 +58,7 @@ const ProgramDetail: React.FC<ProgramDetailProps> = ({ id, onBack, onEditLesson,
   };
 
   const handleDeleteTerm = (termId: string) => {
-    if (confirm('Are you sure you want to delete this term and all its lessons? This action is permanent.')) {
+    if (window.confirm('Delete this term and all its lessons? This action is permanent.')) {
       db.deleteTerm(termId);
       showToast?.('Term removed', 'info');
       setRefreshTrigger(prev => prev + 1);
@@ -60,7 +67,7 @@ const ProgramDetail: React.FC<ProgramDetailProps> = ({ id, onBack, onEditLesson,
 
   const handleDeleteLesson = (e: React.MouseEvent, lessonId: string, title: string) => {
     e.stopPropagation();
-    if (confirm(`Are you sure you want to delete lesson "${title}"?`)) {
+    if (window.confirm(`Permanently delete lesson "${title}"?`)) {
       db.deleteLesson(lessonId);
       showToast?.('Lesson deleted', 'info');
       setRefreshTrigger(prev => prev + 1);
@@ -117,10 +124,10 @@ const ProgramDetail: React.FC<ProgramDetailProps> = ({ id, onBack, onEditLesson,
         </div>
         
         {role !== Role.VIEWER && (
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-4">
             <button 
               onClick={handleDeleteProgram}
-              className="px-6 py-4 text-slate-400 font-black text-xs hover:text-red-600 hover:bg-red-50 rounded-2xl transition-all uppercase tracking-widest"
+              className="px-6 py-4 text-red-600 font-black text-xs hover:bg-red-50 rounded-2xl transition-all uppercase tracking-widest border border-transparent hover:border-red-100"
             >
               Delete Program
             </button>
