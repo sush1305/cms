@@ -1,22 +1,36 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../store';
-import { Status, CatalogProgram, AssetType } from '../types';
+import { Status, CatalogProgram, AssetType, Program, Topic, Lesson } from '../types';
 
 const PublicCatalog: React.FC = () => {
   const [cursor, setCursor] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [programs, setPrograms] = useState<Program[]>([]);
+  const [topics, setTopics] = useState<Topic[]>([]);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
   const limit = 4;
 
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true);
+      await db.init();
+      setPrograms(db.getPrograms());
+      setTopics(db.getTopics());
+      setLessons(db.getLessons('')); // Get all lessons
+      setIsLoading(false);
+    };
+    loadData();
+  }, []);
+
   const allPublished = useMemo(() => {
-    const publishedPrograms = db.getPrograms().filter(p => p.status === Status.PUBLISHED);
-    const topics = db.getTopics();
+    const publishedPrograms = programs.filter(p => p.status === Status.PUBLISHED);
     
-    // Valid catalog programs must have at least 1 published lesson
     return publishedPrograms.map(p => {
       const pTerms = db.getTerms(p.id).map(t => t.id);
-      const lessons = db.getLessons('').filter(l => pTerms.includes(l.term_id) && l.status === Status.PUBLISHED);
+      const pLessons = lessons.filter(l => pTerms.includes(l.term_id) && l.status === Status.PUBLISHED);
       
-      if (lessons.length === 0) return null;
+      if (pLessons.length === 0) return null;
 
       const assets = db.getAssets(p.id).filter(a => a.asset_type === AssetType.POSTER);
       const posterMap: Record<string, Record<string, string>> = {};
@@ -34,13 +48,24 @@ const PublicCatalog: React.FC = () => {
     })
     .filter((p): p is CatalogProgram => p !== null)
     .sort((a, b) => new Date(b.published_at || 0).getTime() - new Date(a.published_at || 0).getTime());
-  }, []);
+  }, [programs, topics, lessons]);
 
   const paginatedData = useMemo(() => {
       return allPublished.slice(cursor, cursor + limit);
   }, [allPublished, cursor]);
 
   const nextCursor = cursor + limit < allPublished.length ? cursor + limit : null;
+
+  if (isLoading) {
+    return (
+      <div className="bg-slate-950 min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="font-black text-slate-500 uppercase tracking-widest text-[10px]">Loading Catalog Feed...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-slate-950 min-h-screen text-white font-sans selection:bg-amber-500 selection:text-white pb-32">

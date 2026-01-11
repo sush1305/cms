@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { db } from '../store';
 import { User } from '../types';
@@ -15,7 +14,8 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdate, onBack }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [message, setMessage] = useState({ text: '', type: '' });
 
-  const handleChangePassword = (e: React.FormEvent) => {
+  // FIX: handleChangePassword made async to await db.changePassword
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage({ text: '', type: '' });
 
@@ -34,7 +34,7 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdate, onBack }) => {
       return;
     }
 
-    const success = db.changePassword(user.id, newPassword);
+    const success = await db.changePassword(user.id, newPassword);
     if (success) {
       const updatedUser = { ...user, password: newPassword };
       onUpdate(updatedUser);

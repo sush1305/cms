@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { db } from '../store';
 import { User, Role } from '../types';
@@ -10,9 +11,9 @@ interface UserManagementProps {
 }
 
 const UserManagement: React.FC<UserManagementProps> = ({ currentUser, onLogout, onBack, showToast }) => {
-  // Initialize state with fresh data from the store
   const [users, setUsers] = useState<User[]>(() => db.getUsers());
   const [isAdding, setIsAdding] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [newUser, setNewUser] = useState({
     username: '',
     email: '',
@@ -20,112 +21,107 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser, onLogout, 
     role: Role.VIEWER
   });
 
-  // Sync state with local database by fetching a fresh list
   const refreshList = useCallback(() => {
     const latest = db.getUsers();
-    // Force React to detect a state change by providing a new array reference
     setUsers([...latest]);
   }, []);
 
-  // Ensure UI is in sync on component mount
   useEffect(() => {
     refreshList();
   }, [refreshList]);
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     const cleanEmail = newUser.email.trim().toLowerCase();
     
-    // Explicit duplicate check before attempting database creation
-    const existing = db.getUserByEmail(cleanEmail);
-    if (existing) {
-      showToast?.(`Member conflict: An account with email "${cleanEmail}" already exists in the roster.`, 'error');
+    // Strict duplication check
+    if (db.getUserByEmail(cleanEmail)) {
+      showToast?.(`Conflict: An account for "${cleanEmail}" is already registered.`, 'error');
       return;
     }
 
+    setIsProcessing(true);
     try {
-      db.createUser({
-        ...newUser,
-        email: cleanEmail
-      });
+      await new Promise(r => setTimeout(r, 600)); // Simulate API delay
+      db.createUser({ ...newUser, email: cleanEmail });
       refreshList();
       setIsAdding(false);
       setNewUser({ username: '', email: '', password: '', role: Role.VIEWER });
-      showToast?.('Team invitation sent successfully', 'success');
+      showToast?.('Team member added successfully', 'success');
     } catch (error: any) {
-      showToast?.(error.message || 'Failed to create user.', 'error');
+      showToast?.(error.message || 'Failed to add user.', 'error');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  const handleDelete = (userId: string, userName: string) => {
-    // Critical safety check: prevent deletion of the primary system admin
+  const handleDelete = async (userId: string, userName: string) => {
     if (userId === 'u1') {
-      showToast?.('Access Denied: The primary Super Admin account is protected and cannot be deleted.', 'error');
+      showToast?.('Protection Error: The primary admin account cannot be removed.', 'error');
       return;
     }
     
     const isSelf = userId === currentUser.id;
     const confirmMessage = isSelf 
-      ? `CRITICAL WARNING: You are about to permanently delete YOUR OWN account ("${userName}").\n\nYou will be immediately logged out and lose all access to this platform. Are you absolutely sure?`
-      : `PERMANENT ACTION: Are you sure you want to revoke all access for "${userName}"?\n\nThis action cannot be undone and all active sessions for this user will be terminated.`;
+      ? `CRITICAL WARNING: You are deleting YOUR OWN account ("${userName}").\n\nYou will be logged out immediately and lose all platform access. Continue?`
+      : `Are you sure you want to permanently revoke all access for "${userName}"?\n\nThis action cannot be undone.`;
 
-    // Trigger explicit browser confirmation
     if (window.confirm(confirmMessage)) {
+      setIsProcessing(true);
       try {
+        await new Promise(r => setTimeout(r, 500)); // Simulate API delay
         db.deleteUser(userId);
         
         if (isSelf) {
-          // If the user deleted themselves, terminate their session
           onLogout();
         } else {
-          // Force immediate UI update for other removals
           refreshList();
           showToast?.(`Access revoked for ${userName}`, 'info');
         }
-      } catch (error) {
-        console.error('Delete failed:', error);
-        showToast?.('A system error occurred while trying to remove the user.', 'error');
+      } catch (error: any) {
+        showToast?.(error.message || 'Deletion failed.', 'error');
+      } finally {
+        setIsProcessing(false);
       }
     }
   };
 
-  const handleRoleChange = (id: string, role: Role) => {
-    const target = db.getUsers().find(u => u.id === id);
-    if (target) {
-      try {
-        db.updateUser({ ...target, role });
+  // FIX: handleRoleChange made async to await db.updateUser
+  const handleRoleChange = async (id: string, role: Role) => {
+    try {
+      const target = db.getUsers().find(u => u.id === id);
+      if (target) {
+        await db.updateUser({ ...target, role });
         refreshList();
-        showToast?.(`Permissions updated: ${target.username} is now a ${role}`, 'success');
-      } catch (error) {
-        showToast?.('Failed to update user role.', 'error');
+        showToast?.(`Permissions updated for ${target.username}`, 'success');
       }
+    } catch (error) {
+      showToast?.('Failed to update role.', 'error');
     }
   };
 
   return (
-    <div className="space-y-8 pb-12 animate-fade-in">
+    <div className={`space-y-8 pb-12 animate-fade-in ${isProcessing ? 'opacity-70 pointer-events-none' : ''}`}>
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="flex items-center space-x-6">
           <button 
             onClick={onBack} 
             className="p-4 hover:bg-black hover:text-white bg-white border border-slate-200 rounded-2xl text-slate-600 shadow-sm transition-all"
-            title="Return to Library"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
           </button>
           <div>
             <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight uppercase">Team Roster</h1>
-            <p className="text-slate-500 mt-2 font-medium">Manage collaborators, invite new members, and provision access permissions.</p>
+            <p className="text-slate-500 mt-2 font-medium">Manage collaborators and provision access tiers.</p>
           </div>
         </div>
         {!isAdding && (
           <button 
             onClick={() => setIsAdding(true)}
-            className="bg-amber-600 hover:bg-amber-700 text-white font-bold py-3.5 px-8 rounded-2xl shadow-lg transition-all transform active:scale-95 flex items-center space-x-2"
+            className="bg-amber-600 hover:bg-amber-700 text-white font-black py-3.5 px-8 rounded-2xl shadow-lg transition-all transform active:scale-95 flex items-center space-x-2"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
-            <span className="uppercase text-xs tracking-widest font-black">Invite Member</span>
+            <span className="uppercase text-xs tracking-widest">Invite Member</span>
           </button>
         )}
       </header>
@@ -133,20 +129,20 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser, onLogout, 
       {isAdding && (
         <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl border border-amber-200 animate-fade-in relative overflow-hidden">
           <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Invite Collaborator</h2>
+            <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">New Invitation</h2>
             <button onClick={() => setIsAdding(false)} className="text-slate-400 hover:text-slate-600 p-2 bg-slate-50 rounded-xl transition-all">
                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
           </div>
           <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
             <div>
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Full Name</label>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Name</label>
               <input 
                 required
                 value={newUser.username}
                 onChange={e => setNewUser({...newUser, username: e.target.value})}
                 className="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl p-4 outline-none focus:border-amber-400 font-bold"
-                placeholder="Ex: John Doe"
+                placeholder="Full Name"
               />
             </div>
             <div>
@@ -157,7 +153,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser, onLogout, 
                 value={newUser.email}
                 onChange={e => setNewUser({...newUser, email: e.target.value})}
                 className="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl p-4 outline-none focus:border-amber-400 font-bold"
-                placeholder="name@company.com"
+                placeholder="email@company.com"
               />
             </div>
             <div>
@@ -193,10 +189,10 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser, onLogout, 
           <table className="w-full text-left border-collapse">
             <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
               <tr>
-                <th className="px-10 py-6">Member Identity</th>
+                <th className="px-10 py-6">Member</th>
                 <th className="px-10 py-6">Email Address</th>
                 <th className="px-10 py-6">Access Role</th>
-                <th className="px-10 py-6 text-right">Revoke Access</th>
+                <th className="px-10 py-6 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
@@ -204,13 +200,12 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser, onLogout, 
                 <tr key={u.id} className="hover:bg-slate-50/50 transition-all group">
                   <td className="px-10 py-6">
                     <div className="flex items-center space-x-4">
-                       <div className="w-10 h-10 rounded-2xl bg-amber-400 text-black flex items-center justify-center font-black text-sm uppercase border-2 border-white shadow-sm">
+                       <div className="w-10 h-10 rounded-2xl bg-amber-400 text-black flex items-center justify-center font-black text-sm border-2 border-white shadow-sm">
                           {u.username.charAt(0).toUpperCase()}
                        </div>
                        <div>
                           <span className="font-black text-slate-900 block leading-none">{u.username}</span>
                           {u.id === 'u1' && <span className="text-[8px] font-black text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded uppercase mt-1 inline-block border border-amber-100">Owner</span>}
-                          {u.id === currentUser.id && <span className="text-[8px] font-black text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded uppercase mt-1 ml-1 inline-block border border-blue-100">You</span>}
                        </div>
                     </div>
                   </td>
@@ -230,12 +225,12 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser, onLogout, 
                       <button 
                         onClick={() => handleDelete(u.id, u.username)}
                         className="p-3 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-2xl transition-all"
-                        title="Permanently remove this user"
+                        title="Delete User"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
                     ) : (
-                      <div className="p-3 text-slate-200 cursor-not-allowed" title="Account is protected">
+                      <div className="p-3 text-slate-200 cursor-not-allowed" title="Protected account">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                       </div>
                     )}

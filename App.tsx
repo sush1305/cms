@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { db } from './store';
 import { User, Role, Status } from './types';
@@ -11,6 +12,7 @@ import UserManagement from './components/UserManagement';
 import Settings from './components/Settings';
 
 const App: React.FC = () => {
+  const [isInitializing, setIsInitializing] = useState(true);
   const [user, setUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('chaishorts_user');
     return saved ? JSON.parse(saved) : null;
@@ -28,6 +30,15 @@ const App: React.FC = () => {
     setTimeout(() => setToast(null), 3000);
   }, []);
 
+  // Initialize DB from Backend
+  useEffect(() => {
+    const initDB = async () => {
+      await db.init();
+      setIsInitializing(false);
+    };
+    initDB();
+  }, []);
+
   const handleLanguageChange = (lang: string) => {
     setLanguage(lang);
     showToast(`Display language updated to ${lang}`, 'success');
@@ -35,10 +46,10 @@ const App: React.FC = () => {
 
   // Worker Process simulation
   useEffect(() => {
-    const interval = setInterval(() => {
-      db.processScheduled();
+    const interval = setInterval(async () => {
+      await db.processScheduled();
       setLastWorkerRun(new Date().toLocaleTimeString());
-    }, 15000); // Check every 15s for demo responsiveness
+    }, 15000); 
     return () => clearInterval(interval);
   }, []);
 
@@ -69,6 +80,17 @@ const App: React.FC = () => {
       goBackToDashboard();
     }
   };
+
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="w-12 h-12 border-4 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
+          <p className="font-black text-slate-400 uppercase tracking-widest text-xs">Connecting to Engine...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!user) {
     if (currentView === 'catalog') {

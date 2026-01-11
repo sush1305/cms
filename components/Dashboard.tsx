@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { db } from '../store';
 import { Status, Program, AssetType, AssetVariant, Role, UUID } from '../types';
@@ -11,11 +12,12 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ onViewProgram, canEdit, userRole, onViewUsers }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [programs, setPrograms] = useState<Program[]>(db.getPrograms());
+  const [programs, setPrograms] = useState<Program[]>([]);
   const [isCreatingModalOpen, setIsCreatingModalOpen] = useState(false);
   const [newProgramTitle, setNewProgramTitle] = useState('');
   const [newProgramDomain, setNewProgramDomain] = useState('');
   const [newProgramTopics, setNewProgramTopics] = useState<UUID[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
   const [filter, setFilter] = useState({
     status: '',
@@ -25,8 +27,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewProgram, canEdit, userRole,
 
   const topics = db.getTopics();
 
-  const refreshPrograms = () => {
+  const refreshPrograms = async () => {
+    setIsLoading(true);
+    await db.init(); // Ensure fresh data
     setPrograms(db.getPrograms());
+    setIsLoading(false);
   };
 
   useEffect(() => {
@@ -37,11 +42,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewProgram, canEdit, userRole,
     const normalizedQuery = searchQuery.toLowerCase().trim();
     const searchMatch = !normalizedQuery || 
                        p.title.toLowerCase().includes(normalizedQuery) || 
-                       p.description.toLowerCase().includes(normalizedQuery);
+                       p.description?.toLowerCase().includes(normalizedQuery);
     
     const statusMatch = !filter.status || p.status === filter.status;
     const langMatch = !filter.language || p.language_primary === filter.language;
-    const topicMatch = !filter.topic || p.topic_ids.includes(filter.topic);
+    const topicMatch = !filter.topic || p.topic_ids?.includes(filter.topic);
     
     return searchMatch && statusMatch && langMatch && topicMatch;
   });
@@ -51,11 +56,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewProgram, canEdit, userRole,
     return assets.find(a => a.asset_type === AssetType.POSTER && a.variant === AssetVariant.PORTRAIT)?.url || 'https://picsum.photos/400/600';
   };
 
-  const handleConfirmCreate = (e: React.FormEvent) => {
+  const handleConfirmCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProgramTitle.trim()) return;
     
-    const newProg = db.createProgram({
+    const newProg = await db.createProgram({
       title: newProgramTitle,
       description: newProgramDomain || 'Educational program exploring ' + newProgramTitle,
       language_primary: 'en',
@@ -69,15 +74,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewProgram, canEdit, userRole,
     setNewProgramDomain('');
     setNewProgramTopics([]);
     
-    refreshPrograms();
+    await refreshPrograms();
     onViewProgram(newProg.id);
   };
 
-  const handleDeleteProgram = (e: React.MouseEvent, id: UUID, title: string) => {
+  const handleDeleteProgram = async (e: React.MouseEvent, id: UUID, title: string) => {
     e.stopPropagation();
     if (window.confirm(`Are you sure you want to permanently delete "${title}"? This will also remove all associated lessons and media.`)) {
-      db.deleteProgram(id);
-      refreshPrograms();
+      await db.deleteProgram(id);
+      await refreshPrograms();
     }
   };
 
@@ -86,6 +91,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewProgram, canEdit, userRole,
       prev.includes(topicId) ? prev.filter(id => id !== topicId) : [...prev, topicId]
     );
   };
+
+  if (isLoading) {
+    return <div className="py-24 text-center font-black text-slate-400 uppercase tracking-widest">Loading Library...</div>;
+  }
 
   return (
     <div className="space-y-10 pb-12 animate-fade-in">
@@ -252,7 +261,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewProgram, canEdit, userRole,
           </div>
         ))}
 
-        {filteredPrograms.length === 0 && (
+        {!isLoading && filteredPrograms.length === 0 && (
           <div className="col-span-full py-24 text-center bg-white rounded-[3rem] border-2 border-dashed border-slate-200">
             <h3 className="text-2xl font-black text-slate-900 tracking-tight uppercase">No matching programs</h3>
           </div>
