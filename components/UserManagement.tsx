@@ -11,7 +11,7 @@ interface UserManagementProps {
 }
 
 const UserManagement: React.FC<UserManagementProps> = ({ currentUser, onLogout, onBack, showToast }) => {
-  const [users, setUsers] = useState<User[]>(() => db.getUsers());
+  const [users, setUsers] = useState<User[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [newUser, setNewUser] = useState({
@@ -21,7 +21,9 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser, onLogout, 
     role: Role.VIEWER
   });
 
-  const refreshList = useCallback(() => {
+  const refreshList = useCallback(async () => {
+    // Force a minor sync with the server if possible, or just get from local store
+    // Since store.ts updates this.users internally on successful API calls, db.getUsers() should be fresh
     const latest = db.getUsers();
     setUsers([...latest]);
   }, []);
@@ -34,7 +36,6 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser, onLogout, 
     e.preventDefault();
     const cleanEmail = newUser.email.trim().toLowerCase();
     
-    // Strict duplication check
     if (db.getUserByEmail(cleanEmail)) {
       showToast?.(`Conflict: An account for "${cleanEmail}" is already registered.`, 'error');
       return;
@@ -42,9 +43,9 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser, onLogout, 
 
     setIsProcessing(true);
     try {
-      await new Promise(r => setTimeout(r, 600)); // Simulate API delay
-      db.createUser({ ...newUser, email: cleanEmail });
-      refreshList();
+      // CRITICAL: Must await the creation to ensure internal store is updated before refresh
+      await db.createUser({ ...newUser, email: cleanEmail });
+      await refreshList();
       setIsAdding(false);
       setNewUser({ username: '', email: '', password: '', role: Role.VIEWER });
       showToast?.('Team member added successfully', 'success');
@@ -69,13 +70,13 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser, onLogout, 
     if (window.confirm(confirmMessage)) {
       setIsProcessing(true);
       try {
-        await new Promise(r => setTimeout(r, 500)); // Simulate API delay
-        db.deleteUser(userId);
+        // CRITICAL: Must await the deletion to ensure internal store is updated before refresh
+        await db.deleteUser(userId);
         
         if (isSelf) {
           onLogout();
         } else {
-          refreshList();
+          await refreshList();
           showToast?.(`Access revoked for ${userName}`, 'info');
         }
       } catch (error: any) {
@@ -86,17 +87,19 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser, onLogout, 
     }
   };
 
-  // FIX: handleRoleChange made async to await db.updateUser
   const handleRoleChange = async (id: string, role: Role) => {
+    setIsProcessing(true);
     try {
       const target = db.getUsers().find(u => u.id === id);
       if (target) {
         await db.updateUser({ ...target, role });
-        refreshList();
+        await refreshList();
         showToast?.(`Permissions updated for ${target.username}`, 'success');
       }
     } catch (error) {
       showToast?.('Failed to update role.', 'error');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -237,6 +240,13 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser, onLogout, 
                   </td>
                 </tr>
               ))}
+              {users.length === 0 && (
+                <tr>
+                   <td colSpan={4} className="px-10 py-12 text-center text-slate-400 font-black uppercase tracking-widest text-xs">
+                      No team members found
+                   </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

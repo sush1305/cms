@@ -14,6 +14,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewProgram, canEdit, userRole,
   const [searchQuery, setSearchQuery] = useState('');
   const [programs, setPrograms] = useState<Program[]>([]);
   const [isCreatingModalOpen, setIsCreatingModalOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [newProgramTitle, setNewProgramTitle] = useState('');
   const [newProgramDomain, setNewProgramDomain] = useState('');
   const [newProgramTopics, setNewProgramTopics] = useState<UUID[]>([]);
@@ -29,7 +30,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewProgram, canEdit, userRole,
 
   const refreshPrograms = async () => {
     setIsLoading(true);
-    await db.init(); // Ensure fresh data
+    await db.init();
     setPrograms(db.getPrograms());
     setIsLoading(false);
   };
@@ -58,24 +59,32 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewProgram, canEdit, userRole,
 
   const handleConfirmCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newProgramTitle.trim()) return;
+    if (!newProgramTitle.trim() || isCreating) return;
     
-    const newProg = await db.createProgram({
-      title: newProgramTitle,
-      description: newProgramDomain || 'Educational program exploring ' + newProgramTitle,
-      language_primary: 'en',
-      languages_available: ['en'],
-      topic_ids: newProgramTopics,
-      status: Status.DRAFT
-    });
-    
-    setIsCreatingModalOpen(false);
-    setNewProgramTitle('');
-    setNewProgramDomain('');
-    setNewProgramTopics([]);
-    
-    await refreshPrograms();
-    onViewProgram(newProg.id);
+    setIsCreating(true);
+    try {
+      const newProg = await db.createProgram({
+        title: newProgramTitle,
+        description: newProgramDomain || 'Educational program exploring ' + newProgramTitle,
+        language_primary: 'en',
+        languages_available: ['en'],
+        topic_ids: newProgramTopics,
+        status: Status.DRAFT
+      });
+      
+      setIsCreatingModalOpen(false);
+      setNewProgramTitle('');
+      setNewProgramDomain('');
+      setNewProgramTopics([]);
+      
+      // Update local state and navigate
+      setPrograms(db.getPrograms());
+      onViewProgram(newProg.id);
+    } catch (error: any) {
+      alert(`Creation Error: ${error.message}`);
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const handleDeleteProgram = async (e: React.MouseEvent, id: UUID, title: string) => {
@@ -151,16 +160,19 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewProgram, canEdit, userRole,
               <div className="flex gap-4 pt-4">
                 <button 
                   type="button"
+                  disabled={isCreating}
                   onClick={() => setIsCreatingModalOpen(false)}
-                  className="flex-1 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-400 hover:bg-slate-50"
+                  className="flex-1 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-400 hover:bg-slate-50 disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit"
-                  className="flex-1 px-6 py-4 bg-black text-amber-400 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl"
+                  disabled={isCreating}
+                  className="flex-1 px-6 py-4 bg-black text-amber-400 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl flex items-center justify-center space-x-2 active:scale-95 transition-transform"
                 >
-                  Create
+                  {isCreating && <div className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></div>}
+                  <span>{isCreating ? 'CREATING...' : 'CREATE'}</span>
                 </button>
               </div>
             </form>

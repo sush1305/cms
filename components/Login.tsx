@@ -50,15 +50,30 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setError('');
     setIsLoading(true);
 
+    // Artificial delay for better UX feel
     setTimeout(() => {
-      const user = db.getUserByEmail(email);
-      if (user && user.password === password) {
-        onLogin(user);
+      const cleanEmail = email.trim();
+      const cleanPassword = password.trim();
+      
+      const user = db.getUserByEmail(cleanEmail);
+      
+      if (user) {
+        // Compare password (trimming just in case of accidental spaces)
+        if (user.password === cleanPassword) {
+          onLogin(user);
+        } else {
+          setError('Security check failed. The password provided is incorrect.');
+        }
       } else {
-        setError('Access denied. Invalid credentials provided.');
+        // More helpful error if no users exist at all in the DB
+        if (db.getUsers().length === 0) {
+          setError('System Error: User database is currently empty. Please wait for the engine to initialize.');
+        } else {
+          setError('Access denied. No account found with the provided credentials.');
+        }
       }
       setIsLoading(false);
-    }, 1200);
+    }, 1000);
   };
 
   const handleResetSubmit = (e: React.FormEvent) => {
@@ -68,7 +83,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
     // Simulate API call to initiate email reset
     setTimeout(() => {
-      const user = db.getUserByEmail(resetEmail);
       // We don't reveal if the user exists for security, but we transition to 'sent'
       setView('sent');
       setIsLoading(false);
