@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { db } from '../store';
 import { Lesson, Status, Role, ContentType, AssetType, AssetVariant, Program, Asset } from '../types';
@@ -85,7 +84,6 @@ const LessonEditor: React.FC<LessonEditorProps> = ({ id, onBack, role, showToast
       };
       reader.readAsDataURL(file);
     }
-    // Reset input so same file can be selected again
     e.target.value = '';
   };
 
@@ -115,6 +113,18 @@ const LessonEditor: React.FC<LessonEditorProps> = ({ id, onBack, role, showToast
     if (lang === lesson.content_language_primary && field === 'content') return;
     const newList = currentList.includes(lang) ? currentList.filter(l => l !== lang) : [...currentList, lang];
     setLesson({ ...lesson, [listField]: newList });
+  };
+
+  const formatDateTimeLocal = (isoString?: string) => {
+    if (!isoString) return '';
+    try {
+        const date = new Date(isoString);
+        if (isNaN(date.getTime())) return '';
+        const offset = date.getTimezoneOffset() * 60000;
+        return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+    } catch (e) {
+        return '';
+    }
   };
 
   return (
@@ -340,7 +350,7 @@ const LessonEditor: React.FC<LessonEditorProps> = ({ id, onBack, role, showToast
           <div className="p-12">
             <div className="max-w-2xl bg-slate-50 p-12 rounded-[3.5rem] border-2 border-slate-100 shadow-inner">
               <h3 className="text-2xl font-black uppercase mb-8 flex items-center space-x-3">
-                <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2v12a2 2 0 002 2z" /></svg>
                 <span>Automated Lifecycle</span>
               </h3>
               
@@ -366,8 +376,22 @@ const LessonEditor: React.FC<LessonEditorProps> = ({ id, onBack, role, showToast
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Publication Timestamp</label>
                   <input 
                     type="datetime-local" 
-                    value={lesson.publish_at ? new Date(new Date(lesson.publish_at).getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : ''} 
-                    onChange={(e) => setLesson({...lesson, publish_at: e.target.value})} 
+                    value={formatDateTimeLocal(lesson.publish_at)} 
+                    onChange={(e) => {
+                        const val = e.target.value;
+                        if (!val) {
+                            setLesson({...lesson, publish_at: undefined});
+                            return;
+                        }
+                        try {
+                            const date = new Date(val);
+                            if (!isNaN(date.getTime())) {
+                                setLesson({...lesson, publish_at: date.toISOString()});
+                            }
+                        } catch (err) {
+                            // Suppress invalid date errors from partial entry
+                        }
+                    }} 
                     className="w-full bg-white border-2 border-slate-200 focus:border-amber-400 rounded-2xl py-5 px-8 font-black outline-none shadow-sm" 
                   />
                   <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest px-2">The background worker will automatically flip the status at this exact moment.</p>
